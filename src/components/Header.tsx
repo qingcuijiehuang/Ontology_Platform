@@ -4,30 +4,33 @@ import { useRoute } from '../hooks/useRoute';
 import { routeToHash } from '../lib/router';
 import { encodeSharePayload } from '../lib/shareCodec';
 import { serializeToRDF } from '../lib/rdf/serializer';
-import { Palette, Check, Database, Trophy, HelpCircle, FileJson, LayoutGrid, Sparkles, FileText, Share2, PenTool, BookOpen, Menu, X, Download, Info } from 'lucide-react';
+import { isLlmConfigured, describeLlm } from '../data/llmProviders';
+import { ModelConnectionIcon } from './LlmConnector';
+import { Palette, Check, Database, FileJson, LayoutGrid, Sparkles, FileText, Share2, PenTool, Menu, X, Download, Plug } from 'lucide-react';
 
 interface HeaderProps {
-  onAboutClick: () => void;
-  onHelpClick: () => void;
   onDataSourcesClick: () => void;
   onImportExportClick: () => void;
   onGalleryClick: () => void;
   onDesignerClick: () => void;
-  onLearnClick: () => void;
   onNLBuilderClick?: () => void;
   onSummaryClick: () => void;
+  onEndpointClick: () => void;
+  onLlmClick: () => void;
 }
 
-export function Header({ onAboutClick, onHelpClick, onDataSourcesClick, onImportExportClick, onGalleryClick, onDesignerClick, onLearnClick, onNLBuilderClick, onSummaryClick }: HeaderProps) {
-  const { theme, setTheme, totalPoints, earnedBadges, currentOntology, dataBindings } = useAppStore();
+export function Header({ onDataSourcesClick, onImportExportClick, onGalleryClick, onDesignerClick, onNLBuilderClick, onSummaryClick, onEndpointClick, onLlmClick }: HeaderProps) {
+  const { theme, setTheme, currentOntology, dataBindings, llm } = useAppStore();
   const route = useRoute();
+  const llmReady = isLlmConfigured(llm);
   const [shareStatus, setShareStatus] = useState<'idle' | 'copying' | 'copied' | 'downloaded'>('idle');
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const [themeMenuOpen, setThemeMenuOpen] = useState(false);
   const themeMenuRef = useRef<HTMLDivElement>(null);
 
-  const ontologyDisplayName = currentOntology.name || 'Untitled Ontology';
+
+  const ontologyDisplayName = currentOntology.name || '未命名本体';
 
   const shareableId = route.page === 'catalogue' && route.ontologyId ? route.ontologyId : null;
 
@@ -69,7 +72,7 @@ export function Header({ onAboutClick, onHelpClick, onDataSourcesClick, onImport
     }
   };
 
-  const shareLabel = shareStatus === 'copied' ? 'Copied!' : shareStatus === 'downloaded' ? 'Downloaded RDF' : shareStatus === 'copying' ? 'Encoding…' : 'Share';
+  const shareLabel = shareStatus === 'copied' ? '已复制' : shareStatus === 'downloaded' ? '已下载 RDF' : shareStatus === 'copying' ? '编码中…' : '分享';
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -109,71 +112,66 @@ export function Header({ onAboutClick, onHelpClick, onDataSourcesClick, onImport
         </svg>
         <div>
           <span className="header-title">
-            Ontology Playground <span className="header-title-preview">(Preview)</span>
+            本体平台 <span className="header-title-preview">Ontology Platform</span>
           </span>
           <span className="header-context">{ontologyDisplayName}</span>
         </div>
       </div>
 
-      <div className="header-stats">
-        <div className="stat-item">
-          <Trophy size={18} />
-          <span className="stat-value">{totalPoints}</span>
-          <span>points</span>
-        </div>
-        <div className="stat-item">
-          <span style={{ fontSize: 18 }}>🏆</span>
-          <span className="stat-value">{earnedBadges.length}</span>
-          <span>badges</span>
-        </div>
-      </div>
-
       <div className="header-actions">
+        <button
+          className={`header-model-btn ${llmReady ? 'is-ready' : 'is-unset'}`}
+          onClick={onLlmClick}
+          title={llmReady ? `模型连接：${describeLlm(llm)}` : '接入大模型（GPT / DeepSeek / GLM 等）'}
+          aria-label="模型连接"
+        >
+          <ModelConnectionIcon size={16} connected={llmReady} />
+          <span>模型连接</span>
+        </button>
+        <button
+          className="header-primary-btn"
+          onClick={onEndpointClick}
+          title="接入 RDF / SPARQL / REST 数据库"
+        >
+          <Plug size={16} />
+          <span>接入数据源</span>
+        </button>
         <button
           className="header-text-btn"
           onClick={handleShare}
-          title={shareableId ? 'Copy shareable link to this ontology' : 'Share this ontology via link'}
+          title={shareableId ? '复制本体分享链接' : '通过链接分享本体'}
           style={shareStatus === 'copied' ? { color: 'var(--ms-green, #107C10)' } : shareStatus === 'downloaded' ? { color: 'var(--ms-blue, #0078D4)' } : undefined}
         >
           {shareStatus === 'downloaded' ? <Download size={16} /> : <Share2 size={16} />}
           <span>{shareLabel}</span>
         </button>
-        <button className="header-text-btn" onClick={onSummaryClick} title="View Ontology Summary">
+        <button className="header-text-btn" onClick={onSummaryClick} title="查看本体摘要">
           <FileText size={16} />
-          <span>Summary</span>
+          <span>摘要</span>
         </button>
         {onNLBuilderClick && (
-          <button className="icon-btn" onClick={onNLBuilderClick} data-tooltip="AI Builder" aria-label="AI Builder">
+          <button className="icon-btn" onClick={onNLBuilderClick} data-tooltip="AI 构建器" aria-label="AI 构建器">
             <Sparkles size={20} />
           </button>
         )}
-        <button className="icon-btn" onClick={onGalleryClick} data-tooltip="Catalogue" aria-label="Catalogue">
+        <button className="icon-btn" onClick={onGalleryClick} data-tooltip="本体库" aria-label="本体库">
           <LayoutGrid size={20} />
         </button>
-        <button className="icon-btn" onClick={onDesignerClick} data-tooltip="Designer" aria-label="Designer">
+        <button className="icon-btn" onClick={onDesignerClick} data-tooltip="本体设计器" aria-label="本体设计器">
           <PenTool size={20} />
         </button>
-        <button className="icon-btn" onClick={onLearnClick} data-tooltip="Ontology School" aria-label="Ontology School">
-          <BookOpen size={20} />
-        </button>
-        <button className="icon-btn" onClick={onImportExportClick} data-tooltip="Import / Export" aria-label="Import / Export">
+        <button className="icon-btn" onClick={onImportExportClick} data-tooltip="导入 / 导出" aria-label="导入 / 导出">
           <FileJson size={20} />
         </button>
-        <button className="icon-btn" onClick={onHelpClick} data-tooltip="Help" aria-label="Help">
-          <HelpCircle size={20} />
-        </button>
-        <button className="icon-btn" onClick={onAboutClick} data-tooltip="About" aria-label="About">
-          <Info size={20} />
-        </button>
-        <button className="icon-btn" onClick={onDataSourcesClick} data-tooltip="Data Sources" aria-label="Data Sources">
+        <button className="icon-btn" onClick={onDataSourcesClick} data-tooltip="数据源说明" aria-label="数据源说明">
           <Database size={20} />
         </button>
         <div className="theme-picker" ref={themeMenuRef}>
           <button
             className="icon-btn"
             onClick={() => setThemeMenuOpen((o) => !o)}
-            data-tooltip="Theme"
-            aria-label="Theme"
+            data-tooltip="主题"
+            aria-label="主题"
             aria-haspopup="menu"
             aria-expanded={themeMenuOpen}
           >
@@ -201,51 +199,39 @@ export function Header({ onAboutClick, onHelpClick, onDataSourcesClick, onImport
 
       {/* Mobile hamburger menu */}
       <div className="header-mobile-menu" ref={menuRef}>
-        <button className="icon-btn header-hamburger" onClick={() => setMenuOpen(!menuOpen)} aria-label="Menu">
+        <button className="icon-btn header-hamburger" onClick={() => setMenuOpen(!menuOpen)} aria-label="菜单">
           {menuOpen ? <X size={22} /> : <Menu size={22} />}
         </button>
         {menuOpen && (
           <div className="mobile-menu-dropdown">
-            <div className="mobile-menu-stats">
-              <Trophy size={16} />
-              <span className="stat-value">{totalPoints}</span>
-              <span>points</span>
-              <span style={{ margin: '0 8px', color: 'var(--text-tertiary)' }}>·</span>
-              <span>🏆</span>
-              <span className="stat-value">{earnedBadges.length}</span>
-              <span>badges</span>
-            </div>
+            <button className="mobile-menu-item" onClick={menuAction(onLlmClick)}>
+              <ModelConnectionIcon size={18} connected={llmReady} /> 模型连接{llmReady ? '' : '（未配置）'}
+            </button>
+            <button className="mobile-menu-item mobile-menu-item--primary" onClick={menuAction(onEndpointClick)}>
+              <Plug size={18} /> 接入数据源
+            </button>
             <button className="mobile-menu-item" onClick={menuAction(handleShare)}>
               <Share2 size={18} /> {shareLabel}
             </button>
             <button className="mobile-menu-item" onClick={menuAction(onSummaryClick)}>
-              <FileText size={18} /> Summary
+              <FileText size={18} /> 摘要
             </button>
             {onNLBuilderClick && (
               <button className="mobile-menu-item" onClick={menuAction(onNLBuilderClick)}>
-                <Sparkles size={18} /> AI Builder
+                <Sparkles size={18} /> AI 构建器
               </button>
             )}
             <button className="mobile-menu-item" onClick={menuAction(onGalleryClick)}>
-              <LayoutGrid size={18} /> Catalogue
+              <LayoutGrid size={18} /> 本体库
             </button>
             <button className="mobile-menu-item" onClick={menuAction(onDesignerClick)}>
-              <PenTool size={18} /> Designer
-            </button>
-            <button className="mobile-menu-item" onClick={menuAction(onLearnClick)}>
-              <BookOpen size={18} /> Ontology School
+              <PenTool size={18} /> 本体设计器
             </button>
             <button className="mobile-menu-item" onClick={menuAction(onImportExportClick)}>
-              <FileJson size={18} /> Import / Export
-            </button>
-            <button className="mobile-menu-item" onClick={menuAction(onHelpClick)}>
-              <HelpCircle size={18} /> Help
-            </button>
-            <button className="mobile-menu-item" onClick={menuAction(onAboutClick)}>
-              <Info size={18} /> About
+              <FileJson size={18} /> 导入 / 导出
             </button>
             <button className="mobile-menu-item" onClick={menuAction(onDataSourcesClick)}>
-              <Database size={18} /> Data Sources
+              <Database size={18} /> 数据源说明
             </button>
             <div className="mobile-menu-themes">
               {THEME_OPTIONS.map((opt) => (

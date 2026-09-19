@@ -41,11 +41,13 @@ function findEntry(id: string): CatalogueTestEntry {
 }
 
 describe('catalogue compilation (end-to-end)', () => {
+  // 该用例会 fork 一个 `npx tsx` 子进程编译真实 catalogue，冷启动在 Windows 上
+  // 实测 5~12s（`npx` 解析 + tsx 启动占大头），因此显式放宽 vitest 的 5s 默认超时。
   it('npm run catalogue:build succeeds with the real catalogue', () => {
     const result = execSync('npx tsx scripts/compile-catalogue.ts', {
       cwd: ROOT,
       encoding: 'utf-8',
-      timeout: 30000,
+      timeout: 30_000,
     });
     expect(result).toContain('official/cosmic-coffee');
     expect(result).toContain('official/ecommerce');
@@ -54,7 +56,7 @@ describe('catalogue compilation (end-to-end)', () => {
     expect(output.count).toBe(output.entries.length);
     expect(output.entries.length).toBeGreaterThan(0);
     expect(output.generatedAt).toBeTruthy();
-  });
+  }, 60_000);
 
   it('catalogue.json entries have required fields', () => {
     const output = readCatalogue();

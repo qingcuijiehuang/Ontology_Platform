@@ -1,6 +1,6 @@
 {
   "name": "Fourth Coffee",
-  "description": "A sample ontology representing a modern coffee shop chain with suppliers, products, stores, customers, and orders.",
+  "description": "描述现代连锁咖啡店的示例本体，涵盖供应商、产品、门店、客户与订单。",
   "icon": "☕",
   "category": "retail",
   "tags": [

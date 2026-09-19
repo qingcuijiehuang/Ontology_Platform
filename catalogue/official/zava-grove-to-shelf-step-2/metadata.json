@@ -1,6 +1,6 @@
 {
   "name": "Zava Grove-to-Shelf — Step 2: Harvest & Quality",
-  "description": "Add HarvestLot and QualityCheck to capture every harvest event and the four-stage quality regime.",
+  "description": "加入采收批次与质检，记录每一次采收事件与四阶段质检制度。",
   "icon": "🔍",
   "category": "school",
   "tags": [

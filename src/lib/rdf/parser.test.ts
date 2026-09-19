@@ -407,4 +407,101 @@ describe('parseRDF', () => {
       expect(ontology.entityTypes[0].name).toBe('Widget');
     });
   });
+
+  // 外部工具（Protégé / 数据库导出 / 网上本体）生成的 RDF/XML 写法多样，
+  // 这里锁定常见变体，避免再出现「合法文件被判成没有本体」的回归。
+  describe('RDF/XML 写法兼容（外部导入）', () => {
+    it('parses rdf:Description + rdf:type owl:Class', () => {
+      const rdf = `<?xml version="1.0" encoding="UTF-8"?>
+<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+         xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
+         xmlns:owl="http://www.w3.org/2002/07/owl#">
+    <rdf:Description rdf:about="http://example.org/o/">
+        <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#Ontology"/>
+        <rdfs:label>Described Ontology</rdfs:label>
+    </rdf:Description>
+    <rdf:Description rdf:about="http://example.org/o/Customer">
+        <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#Class"/>
+        <rdfs:label>Customer</rdfs:label>
+    </rdf:Description>
+    <rdf:Description rdf:about="http://example.org/o/Order">
+        <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#Class"/>
+        <rdfs:label>Order</rdfs:label>
+    </rdf:Description>
+    <rdf:Description rdf:about="http://example.org/o/places">
+        <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#ObjectProperty"/>
+        <rdfs:label>下单</rdfs:label>
+        <rdfs:domain rdf:resource="http://example.org/o/Customer"/>
+        <rdfs:range rdf:resource="http://example.org/o/Order"/>
+    </rdf:Description>
+    <rdf:Description rdf:about="http://example.org/o/customer_id">
+        <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#DatatypeProperty"/>
+        <rdfs:label>id</rdfs:label>
+        <rdfs:domain rdf:resource="http://example.org/o/Customer"/>
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+    </rdf:Description>
+</rdf:RDF>`;
+      const { ontology } = parseRDF(rdf);
+      expect(ontology.name).toBe('Described Ontology');
+      expect(ontology.entityTypes.map(e => e.id).sort()).toEqual(['customer', 'order']);
+      expect(ontology.relationships).toHaveLength(1);
+      expect(ontology.relationships[0]).toMatchObject({ id: 'places', from: 'customer', to: 'order' });
+      expect(ontology.entityTypes.find(e => e.id === 'customer')?.properties.map(p => p.name)).toContain('id');
+    });
+
+    it('parses a document whose root element is <owl:Ontology>', () => {
+      const rdf = `<?xml version="1.0" encoding="UTF-8"?>
+<owl:Ontology xmlns:owl="http://www.w3.org/2002/07/owl#"
+              xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+              xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
+              rdf:about="http://example.org/bare/">
+    <rdfs:label>Bare Root</rdfs:label>
+</owl:Ontology>`;
+      const { ontology } = parseRDF(rdf);
+      expect(ontology.name).toBe('Bare Root');
+    });
+
+    it('accepts the legacy owl namespace without a trailing "#"', () => {
+      const rdf = `<?xml version="1.0" encoding="UTF-8"?>
+<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+         xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
+         xmlns:owl="http://www.w3.org/2002/07/owl">
+    <owl:Class rdf:about="http://example.org/legacy/Thing">
+        <rdfs:label>Thing</rdfs:label>
+    </owl:Class>
+</rdf:RDF>`;
+      const { ontology } = parseRDF(rdf);
+      expect(ontology.entityTypes).toHaveLength(1);
+      expect(ontology.entityTypes[0].id).toBe('thing');
+    });
+
+    it('falls back to rdfs:Class when owl:Class is absent', () => {
+      const rdf = `<?xml version="1.0" encoding="UTF-8"?>
+<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+         xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#">
+    <rdfs:Class rdf:about="http://example.org/rdfs/Document">
+        <rdfs:label>Document</rdfs:label>
+    </rdfs:Class>
+</rdf:RDF>`;
+      const { ontology } = parseRDF(rdf);
+      expect(ontology.entityTypes).toHaveLength(1);
+      expect(ontology.entityTypes[0].name).toBe('Document');
+    });
+
+    it('explains how to convert when the file is Turtle', () => {
+      const ttl = `@prefix owl: <http://www.w3.org/2002/07/owl#> .
+<http://example.org/o> a owl:Ontology .`;
+      expect(() => parseRDF(ttl)).toThrow(RDFParseError);
+      expect(() => parseRDF(ttl)).toThrow(/RDF\/XML/);
+    });
+
+    it('reports instance-only documents as data rather than an ontology', () => {
+      const rdf = `<?xml version="1.0" encoding="UTF-8"?>
+<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+         xmlns:owl="http://www.w3.org/2002/07/owl#">
+    <owl:NamedIndividual rdf:about="http://example.org/o#c1"/>
+</rdf:RDF>`;
+      expect(() => parseRDF(rdf)).toThrow(/实例数据/);
+    });
+  });
 });

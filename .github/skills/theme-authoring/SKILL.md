@@ -44,11 +44,14 @@ Make all edits in [`src/store/appStore.ts`](../../../src/store/appStore.ts) and
 
 ## Critical Rules
 
-- **Opaque canvas base for light themes.** `--chess-square-light` is the graph
-  canvas's solid backdrop. The theme class sits on `.app-container`, not `<body>`,
-  and `<body>` stays dark (`#1B1B1B`). A translucent `--chess-square-light` lets
-  the dark body bleed through → dark canvas + unreadable labels. Use an opaque
-  light color (e.g. `#FBF7F8`), not `rgba(..., 0.03)`. (Guide → Gotcha 1.)
+- **First paint must match the stored theme.** `themeClass()` lands on the app
+  surfaces *and* — via a small inline script in `index.html` — on `<html>` before
+  the bundle loads. That script is what stops `<body>` from painting the dark
+  `:root` palette, and what removes the dark flash on load. Register a new theme
+  id there too, or first paint uses the wrong palette.
+- **Keep the graph canvas opaque.** `.graph-container` paints a plain solid
+  `--graph-bg` (no pattern), so a translucent value lets the body bleed through,
+  darkens the canvas, and makes labels unreadable. (Guide → Gotcha 1.)
 - **Graph colors are CSS-driven.** Define `--graph-bg`, `--graph-node-text`,
   `--graph-edge-color`, `--graph-edge-text`, `--graph-edge-label-bg` in the
   block; the graph and designer read them at runtime. No `.tsx` edits.

@@ -31,6 +31,12 @@ export interface EntityType {
   properties: Property[];
   icon: string;
   color: string;
+  /**
+   * 跨语言 / 近义别名。本地图谱检索与按问题相关性召回行时，会把这些别名
+   * 一并作为匹配串（haystack），让中文问题也能命中以英文为主的本体。
+   * 建议同时给「类目下对象的中文叫法」「业务口语」「外文同义词」各放几条。
+   */
+  synonyms?: string[];
 }
 
 export interface EntityInstance {
@@ -64,6 +70,7 @@ export const cosmicCoffeeOntology: Ontology = {
       description: "A person who purchases coffee products from our stores",
       icon: "👤",
       color: "#0078D4", // Microsoft Blue
+      synonyms: ["客户", "会员", "顾客", "买家", "customer", "client", "会员等级", "loyalty"],
       properties: [
         { name: "customerId", type: "string", isIdentifier: true, description: "Unique customer identifier" },
         { name: "name", type: "string", description: "Full name of the customer" },
@@ -79,6 +86,7 @@ export const cosmicCoffeeOntology: Ontology = {
       description: "A customer purchase transaction at a store",
       icon: "🧾",
       color: "#107C10", // Microsoft Green
+      synonyms: ["订单", "购物", "交易", "购买", "下单", "买单", "order", "transaction", "purchase"],
       properties: [
         { name: "orderId", type: "string", isIdentifier: true, description: "Unique order identifier" },
         { name: "timestamp", type: "datetime", description: "When the order was placed" },
@@ -93,6 +101,7 @@ export const cosmicCoffeeOntology: Ontology = {
       description: "A coffee product or item available for sale",
       icon: "☕",
       color: "#5C2D91", // Microsoft Purple
+      synonyms: ["商品", "产品", "咖啡", "饮品", "咖啡豆", "product", "item", "menu", "SKU"],
       properties: [
         { name: "productId", type: "string", isIdentifier: true, description: "Unique product identifier" },
         { name: "name", type: "string", description: "Product name" },
@@ -108,6 +117,7 @@ export const cosmicCoffeeOntology: Ontology = {
       description: "A physical coffee shop location",
       icon: "🏪",
       color: "#FFB900", // Microsoft Yellow/Gold
+      synonyms: ["门店", "店铺", "咖啡馆", "店面", "分店", "store", "shop", "location", "branch", "cafe"],
       properties: [
         { name: "storeId", type: "string", isIdentifier: true, description: "Unique store identifier" },
         { name: "name", type: "string", description: "Store name" },
@@ -123,6 +133,7 @@ export const cosmicCoffeeOntology: Ontology = {
       description: "A coffee bean or goods supplier partner",
       icon: "🚚",
       color: "#D83B01", // Microsoft Orange
+      synonyms: ["供应商", "供货商", "厂商", "供货", "supplier", "vendor", "partner"],
       properties: [
         { name: "supplierId", type: "string", isIdentifier: true, description: "Unique supplier identifier" },
         { name: "name", type: "string", description: "Supplier company name" },
@@ -137,6 +148,7 @@ export const cosmicCoffeeOntology: Ontology = {
       description: "A delivery of goods from supplier to store",
       icon: "📦",
       color: "#00A9E0", // Light Blue
+      synonyms: ["货运", "物流", "配送", "运输", "发货", "shipment", "delivery", "shipping", "logistics"],
       properties: [
         { name: "shipmentId", type: "string", isIdentifier: true, description: "Unique shipment identifier" },
         { name: "dispatchDate", type: "date", description: "Date shipped from supplier" },

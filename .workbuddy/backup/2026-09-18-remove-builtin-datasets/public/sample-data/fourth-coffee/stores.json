@@ -1,0 +1,16 @@
+{
+  "dataset": "fourth-coffee.stores",
+  "source": "Data Lakehouse (bronze)",
+  "table": "lakehouse.bronze.stores",
+  "entityTypeId": "store",
+  "rowCount": 6,
+  "generatedAt": "2026-09-13",
+  "rows": [
+    { "store_id": "STORE-001", "store_name": "Fourth Coffee - Downtown Seattle", "city": "Seattle", "state_code": "WA", "opened_on": "2022-06-15", "seat_capacity": 45 },
+    { "store_id": "STORE-002", "store_name": "Fourth Coffee - Capitol Hill", "city": "Seattle", "state_code": "WA", "opened_on": "2023-02-28", "seat_capacity": 32 },
+    { "store_id": "STORE-003", "store_name": "Fourth Coffee - Bellevue Square", "city": "Bellevue", "state_code": "WA", "opened_on": "2023-09-12", "seat_capacity": 38 },
+    { "store_id": "STORE-004", "store_name": "Fourth Coffee - Portland Pearl", "city": "Portland", "state_code": "OR", "opened_on": "2024-04-03", "seat_capacity": 41 },
+    { "store_id": "STORE-005", "store_name": "Fourth Coffee - San Francisco Mission", "city": "San Francisco", "state_code": "CA", "opened_on": "2024-10-21", "seat_capacity": 28 },
+    { "store_id": "STORE-006", "store_name": "Fourth Coffee - Vancouver Gastown", "city": "Vancouver", "state_code": "BC", "opened_on": "2025-05-09", "seat_capacity": 36 }
+  ]
+}

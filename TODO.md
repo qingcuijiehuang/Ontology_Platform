@@ -43,6 +43,11 @@ The current RDF export is inline in `ImportExportModal.tsx` and there is no RDF
   - Missing required fields → descriptive error
   - Namespace handling (custom prefixes, default namespace)
   - Malformed XML → graceful error
+  - External RDF/XML dialects: `rdf:Description` + `rdf:type`, bare
+    `<owl:Ontology>` root, legacy `owl` namespace without `#`, `rdfs:Class`
+  - Non-XML syntaxes (Turtle / JSON-LD) get a "how to convert" hint instead
+    of a generic parse failure
+  - Instance-only documents are reported as data, not as an empty ontology
 - [x] Round-trip tests: serialize → parse → deep-equal for every sample ontology
   in `sampleOntologies.ts` and `cosmicCoffeeOntology`
 - [x] Integration test: import an RDF file via the modal, verify store state
@@ -169,6 +174,10 @@ into a static JSON file.
 - [x] Add "View RDF source" button for each ontology (links to the raw file
   in the repo or displays inline)
 - [x] Add pagination or virtual scroll if the catalogue grows large
+- [x] Localise the catalogue to Chinese: UI labels (search, filters, "show
+  more", footer, card tooltips), `CATEGORY_LABELS`, and all 71 entry
+  descriptions in `catalogue/*/*/metadata.json`. Ontology / entity / property
+  names stay as authored in the RDF so ids, search and export are unaffected.
 
 ---
 
@@ -462,8 +471,115 @@ social media) often land on mobile — if users can't interact, adoption stalls.
 
 ---
 
+## 11. Data source connection（已改为「无内置数据集」形态）
+
+- [x] **移除全部内置数据集**：删除 `src/data/dataSources.ts`（预设案例集）与
+  `public/sample-data/fourth-coffee/` 样本数据；产品不再带任何示例数据源
+- [x] Store：`endpoints` 初始为空，`buildDefaultEndpoints()` 恒返回 `[]`，
+  移除 `addPreset` / `presetId` / `isDefault`
+- [x] 接入面板只保留两种方式：**自动解析**（上传 JSON）与**手动填写**
+  （JSON 文件为默认且首选类型，其后依次 REST / SPARQL / GraphQL）
+- [x] 「清空全部」按钮：断开并移除全部数据源，回到空白初始状态
+- [x] Instance Browser shows the mapped entity and translates source columns to
+  ontology property names
+- [x] Tests: `appStore.endpoints.test.ts`（空初始 / 增删 / 清空）、
+  `EndpointConnector.test.tsx`（面板结构、手动表单默认 JSON 类型、自动解析流程）
+- [x] Docs: `docs/default-data-sources.md`（重写为数据源接入指南）
+
+### 11.1 Auto-parse & connect a local JSON file (自动解析接入)
+
+- [x] `src/lib/jsonAutoImport.ts` — 纯函数解析层：行提取 → 列收集 → 实体识别 →
+  列映射自动生成，UI 只负责取文本与渲染
+- [x] Upload / drag-and-drop a `.json` file in「自定义接入 → 自动解析接入」
+- [x] Auto-detect the ontology entity from column headers (scored, with a minimum
+  threshold so unrelated headers are **not** guessed) and auto-build
+  `columnMappings` (greedy one-property-per-column assignment)
+- [x] Preview before connecting: file name, row / column count, `source → property`
+  mapping chips, warnings; switching the entity live-recomputes the mappings
+- [x] Tolerant input: object arrays, `items` / `rows` / `results` / `data` wrappers,
+  GraphQL `data`, SPARQL `results.bindings`, single object, BOM
+- [x] Actionable Chinese errors for CSV / JSON Lines / empty files instead of
+  silently importing nothing
+- [x] Caps: 8 MB per file, 5000 rows kept (truncation is reported in the preview)
+- [x] `DataEndpoint.localRows` / `localFileName`; `fetchEndpointRows` returns the
+  in-memory rows without any network call, so local sources work offline and
+  bypass CORS
+- [x] Tests: `src/lib/jsonAutoImport.test.ts` (25), `datasetFetcher.test.ts` (local
+  source path), `EndpointConnector.test.tsx` (upload → preview → connect flow)
+
+### 11.1 Multi-entity bucketed graph JSON (`{ objects, relationships }`)
+
+- [x] `bucketContainerOf()` detects `objects` / `entities` / `instances` / `nodes`
+  containers holding `{ entityName: [rows] }`; a plain `{ data: { orders: [...] } }`
+  REST / GraphQL payload is deliberately **not** treated as a bucketed graph
+- [x] Each bucket becomes its own `GraphBucket` (rows / columns / truncation) and
+  is connected as a **separate** data source named `文件名 · 桶名`
+- [x] `matchEntityByBucketName()` matches bucket names against ontology entity
+  names (`Test_Case` ≡ `TestCase`, `Requirement_Document` → `Requirement`),
+  exact matches winning over containment; `assignBucketEntities()` greedily
+  guarantees one entity per bucket
+- [x] A bucket whose name clearly looks like an entity name but does not exist in
+  the ontology is **left unmapped** instead of falling back to column guessing
+  (which used to map `Test_Case` onto an unrelated `Order`); generic container
+  names (`rows`, `data`, …) still allow column-based guessing
+- [x] `relationships` / `relations` / `edges` / `links` are extracted and can be
+  connected as an extra relation data source (`文件名 · relationships`)
+- [x] Preview UI in `EndpointConnector.tsx`: per-bucket checkboxes (row / column
+  count + matched entity), select-all toggle, relation toggle, name-prefix input,
+  live「N 个桶已匹配」summary, and an explicit warning when nothing matched
+- [x] Re-uploading the same file **refreshes** the existing data sources in place
+  instead of stacking duplicates
+- [x] Entity chips in the connected-endpoints list now resolve against
+  `currentOntology` instead of the hard-coded Fourth Coffee ontology
+- [x] Tests: `src/lib/jsonAutoImport.test.ts` (40),
+  `src/components/EndpointConnector.test.tsx` (17)
+
+---
+
+## 12. LLM-grounded retrieval Q&A (智能检索问答)
+
+- [x] Provider presets in `src/data/llmProviders.ts` — OpenAI GPT, DeepSeek,
+  Zhipu GLM, DashScope Qwen, Kimi, SiliconFlow, local Ollama, custom
+  OpenAI-compatible gateway (all via the OpenAI-compatible `/chat/completions`)
+- [x] `LlmConfig` persisted to `localStorage` (`ontology-platform.llm-config`)
+  with `setLlmConfig` / `resetLmConfig` actions in the app store
+- [x] LLM client (`src/lib/llmClient.ts`): ontology + dataset grounding context,
+  message assembly, streaming SSE and non-streaming calls, error classification
+  (auth / not-found / rate-limit / server / cors / timeout / empty)
+- [x] Shared dataset fetcher (`src/lib/datasetFetcher.ts`) reused by both the
+  Instance Browser and the Q&A console
+- [x] Model connection modal (`src/components/LlmConnector.tsx`) with provider
+  grid, endpoint, API key (masked), model quick-chips, temperature / max tokens,
+  live connection test, proxy prefix for private gateways
+- [x] Top-right model-connection icon with status dot (custom SVG chip icon)
+- [x] Answer console below the graph (`src/components/AIQueryConsole.tsx`):
+  local graph hits + real dataset rows → streamed LLM answer, with a citations
+  block (engine, latency, context size, ontology, datasets, graph hits) and
+  clickable hit chips
+- [x] Graceful degradation: no model → local query engine answer + upgrade hint;
+  LLM failure → error hint plus local answer so there is always output
+- [x] Layout: left column split into graph + console; `QueryPlayground`
+  superseded; footer moved under the console
+- [x] Tests: `src/data/llmProviders.test.ts` (22),
+  `src/lib/llmClient.test.ts` (24), `src/lib/datasetFetcher.test.ts` (17)
+- [x] Docs: `docs/llm-integration.md` (providers, workflow, CORS findings,
+  security, troubleshooting, cost tips)
+---
+
 ## Low-priority / deferred
 
+- [x] **存入本体库**（2026-09-18）：导入 RDF 成功后在「导入 / 导出本体」弹窗内
+  提供「存入本体库」按钮，把当前导入的本体写入 localStorage 本体库（`source: 'local'`，
+  作者「我」）；本体库弹窗合并展示「我的」条目（排最前、可筛选、可删除、同名覆盖），
+  本地条目加载后直接关闭弹窗（无深链）。
+- [x] **数据源存入本体库**（2026-09-18）：「接入数据源」面板顶部新增
+  **「存入本体库」**，把当前本体与已接入的全部数据源一起存成同一条目；
+  `saveUserOntology(ontology, bindings, endpoints?)` —— 不传 endpoints 表示
+  「不动已存的数据源」（导入路径用），传数组表示整体替换（数据源面板用）。
+  本地 JSON 文件的行数据不入库（剥离 + `needsFileReupload` 标记，加载后提示重新上传），
+  运行时抓取状态同样剥离；本体库卡片显示「N 个数据源」，加载时一并恢复。
+- [x] **移除「推送到 Microsoft Fabric」按钮**：`ImportExportModal` 不再提供
+  Fabric 入口（`FabricExportModal` 组件与 `src/lib/fabric.ts` 保留但未挂载）。
 - [ ] **"Use in Fabric IQ" export wizard** — A guided flow (validate →
   download RDF → show Fabric IQ upload instructions). Deferred until the
   Fabric IQ integration story is clearer and a native link/API may be

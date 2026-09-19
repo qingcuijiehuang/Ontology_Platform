@@ -1,0 +1,198 @@
+/**
+ * 本地 CORS 代理（scripts/llm-proxy.mjs）的回归测试
+ * ---------------------------------------------------------------------------
+ * 这套测试锁住两件事：
+ *  1. **URL 还原**：`withProxy()` 拼出来的 `/https://host/path?x=1` 必须能
+ *     被准确还原；少数客户端会把路径里的 `//` 折叠成 `/`，也要能容错。
+ *  2. **预检与 CORS 头**：原网关的失败点就是 OPTIONS 返回 403、
+ *     响应不带 `Access-Control-Allow-Origin`。代理必须把这两点补齐，
+ *     并且 SSE 要逐段直通（不能被缓冲成一整包）。
+ * 端到端部分使用真实 http 服务，全程不发外网请求。
+ */
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import http from 'node:http';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import type { AddressInfo } from 'node:net';
+import {
+  buildCorsHeaders,
+  DEFAULT_HOST,
+  DEFAULT_PORT,
+  isAllowedTarget,
+  resolveTargetUrl,
+  startProxy,
+} from './llm-proxy.mjs';
+import { DEFAULT_LOCAL_PROXY_BASE } from '../src/data/llmProviders';
+import { llmErrorHint } from '../src/lib/llmClient';
+
+describe('默认地址与 UI 常量一致', () => {
+  it('「填入本地代理」按钮预填的地址必须就是代理的真实监听地址', () => {
+    // 两处各写一次端口/主机，很容易改了一边忘另一边 —— 那种错只会在用户点了
+    // 「填入本地代理」之后才暴露（连不上），所以这里用测试锁死。
+    expect(DEFAULT_LOCAL_PROXY_BASE).toBe(`http://${DEFAULT_HOST}:${DEFAULT_PORT}`);
+  });
+
+  it('默认绑定回环地址，不会把带 Key 的转发通道暴露到局域网', () => {
+    expect(DEFAULT_HOST).toBe('127.0.0.1');
+  });
+
+  it('提示文案里的 npm 脚本名必须真实存在（曾出现文案写 llm:proxy 而脚本叫别的）', async () => {
+    // 这类漂移最阴：文案看着对，用户复制执行却报 "Missing script"，
+    // 而且它不会让任何测试变红。所以直接从错误提示里反查脚本名。
+    const hint = llmErrorHint('cors');
+    const match = hint.match(/npm run ([\w:-]+)/);
+    expect(match).not.toBeNull();
+    const scriptName = match![1];
+
+    const pkg = JSON.parse(
+      // 用字符串路径而不是 file:// URL：AI 沙箱里的 fs shim 只接受普通路径
+      readFileSync(resolve(process.cwd(), 'package.json'), 'utf-8'),
+    ) as { scripts?: Record<string, string> };
+    expect(pkg.scripts?.[scriptName]).toBeTruthy();
+    // 该脚本指向的就是本文件测试的这个代理
+    expect(pkg.scripts![scriptName]).toContain('llm-proxy.mjs');
+  });
+});
+
+describe('resolveTargetUrl', () => {
+  it('路径式：还原出完整上游地址', () => {
+    expect(resolveTargetUrl('/https://api.qingcuicore.com/v1/chat/completions')).toBe(
+      'https://api.qingcuicore.com/v1/chat/completions',
+    );
+  });
+
+  it('路径式：保留上游自带的查询串（SPARQL / GraphQL 场景）', () => {
+    expect(resolveTargetUrl('/https://example.org/sparql?query=SELECT&format=json')).toBe(
+      'https://example.org/sparql?query=SELECT&format=json',
+    );
+  });
+
+  it('容错：连续斜杠被折叠成单个也能还原', () => {
+    expect(resolveTargetUrl('/https:/api.qingcuicore.com/v1/chat/completions')).toBe(
+      'https://api.qingcuicore.com/v1/chat/completions',
+    );
+  });
+
+  it('查询式：?url= 编码形式同样支持', () => {
+    const target = 'https://api.example.com/v1/chat/completions';
+    expect(resolveTargetUrl(`/?url=${encodeURIComponent(target)}`)).toBe(target);
+  });
+
+  it('用法不符合约定时返回 null，交给上层报 400 而不是硬拼一个错地址', () => {
+    expect(resolveTargetUrl('/')).toBeNull();
+    expect(resolveTargetUrl('/foo/bar')).toBeNull();
+  });
+});
+
+describe('isAllowedTarget', () => {
+  it('白名单为空时放行任意上游', () => {
+    expect(isAllowedTarget('https://anything.example/x', [])).toBe(true);
+  });
+
+  it('按域名与其子域匹配', () => {
+    expect(isAllowedTarget('https://api.qingcuicore.com/v1', ['qingcuicore.com'])).toBe(true);
+    expect(isAllowedTarget('https://qingcuicore.com/v1', ['qingcuicore.com'])).toBe(true);
+    expect(isAllowedTarget('https://evil.com/v1', ['qingcuicore.com'])).toBe(false);
+  });
+
+  it('后缀相似但并非子域的不放行', () => {
+    expect(isAllowedTarget('https://notqingcuicore.com/v1', ['qingcuicore.com'])).toBe(false);
+  });
+});
+
+describe('buildCorsHeaders', () => {
+  it('回显 origin 与请求头，并带上 Vary', () => {
+    const headers = buildCorsHeaders({
+      headers: {
+        origin: 'http://localhost:5173',
+        'access-control-request-headers': 'authorization,content-type',
+      },
+    });
+    expect(headers['access-control-allow-origin']).toBe('http://localhost:5173');
+    // 少回一个 authorization，预检就会失败 —— 这正是本代理存在的首要理由
+    expect(headers['access-control-allow-headers']).toContain('authorization');
+    expect(headers.vary).toContain('origin');
+  });
+
+  it('没有 origin 时回落为 *', () => {
+    expect(buildCorsHeaders({ headers: {} })['access-control-allow-origin']).toBe('*');
+  });
+});
+
+describe('代理端到端（真实 http 服务，不发外网）', () => {
+  let upstream: http.Server;
+  let upstreamPort = 0;
+  let proxy: { server: http.Server; url: string };
+  let seenAuthorization: string | undefined;
+
+  beforeAll(async () => {
+    upstream = http.createServer((req, res) => {
+      seenAuthorization = req.headers.authorization;
+      if (req.url === '/v1/chat/completions') {
+        res.writeHead(200, { 'content-type': 'text/event-stream; charset=utf-8' });
+        res.write('data: {"choices":[{"delta":{"content":"连"}}]}\n\n');
+        setTimeout(() => {
+          res.write('data: {"choices":[{"delta":{"content":"通"}}]}\n\n');
+          res.end('data: [DONE]\n\n');
+        }, 25);
+        return;
+      }
+      res.writeHead(404).end();
+    });
+    await new Promise<void>((resolve) => upstream.listen(0, '127.0.0.1', () => resolve()));
+    upstreamPort = (upstream.address() as AddressInfo).port;
+    proxy = await startProxy({ port: 0, onLog: () => {} });
+  });
+
+  afterAll(async () => {
+    await new Promise<void>((resolve) => {
+      proxy.server.closeAllConnections();
+      proxy.server.close(() => resolve());
+    });
+    await new Promise<void>((resolve) => {
+      upstream.closeAllConnections();
+      upstream.close(() => resolve());
+    });
+  });
+
+  it('OPTIONS 预检返回 204 且带 CORS 头（原网关此处是 403，浏览器就是死在这）', async () => {
+    const res = await fetch(`${proxy.url}/https://api.example.com/v1/chat/completions`, {
+      method: 'OPTIONS',
+      headers: {
+        origin: 'http://localhost:5173',
+        'access-control-request-headers': 'authorization,content-type',
+      },
+    });
+    expect(res.status).toBe(204);
+    expect(res.headers.get('access-control-allow-origin')).toBe('http://localhost:5173');
+    expect(res.headers.get('access-control-allow-headers')).toContain('authorization');
+  });
+
+  it('POST 转发：上游收到 Authorization，响应带回 CORS 头与完整 SSE 增量', async () => {
+    const target = `http://127.0.0.1:${upstreamPort}/v1/chat/completions`;
+    const res = await fetch(`${proxy.url}/${target}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: 'Bearer sk-test' },
+      body: JSON.stringify({ model: 'gpt-5.6-sol', messages: [{ role: 'user', content: 'hi' }] }),
+    });
+    expect(res.status).toBe(200);
+    expect(res.headers.get('access-control-allow-origin')).toBeTruthy();
+    const text = await res.text();
+    expect(text).toContain('连');
+    expect(text).toContain('通');
+    expect(seenAuthorization).toBe('Bearer sk-test');
+  });
+
+  it('健康检查供「检测代理」按钮使用', async () => {
+    const res = await fetch(`${proxy.url}/__health`);
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toMatchObject({ ok: true });
+  });
+
+  it('用法错误时给中文可执行提示，而不是 500 或空响应', async () => {
+    const res = await fetch(`${proxy.url}/not-a-target`);
+    expect(res.status).toBe(400);
+    const body = JSON.stringify(await res.json());
+    expect(body).toContain('代理前缀');
+  });
+});

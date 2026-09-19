@@ -8,7 +8,13 @@ export interface CatalogueEntry {
   category: string;
   tags: string[];
   author: string;
-  source: 'official' | 'community' | 'external';
+  /**
+   * 来源。`local` 表示用户在本地「导入 RDF → 存入本体库」保存的本体
+   * （只存在浏览器 localStorage 里，不随 catalogue.json 分发）。
+   */
+  source: 'official' | 'community' | 'external' | 'local';
+  /** 本地保存条目专用：保存时间（ms）。编译期条目不会有这个字段。 */
+  savedAt?: number;
   ontology: Ontology;
   bindings: DataBinding[];
 }
@@ -20,18 +26,18 @@ export interface Catalogue {
 }
 
 export const CATEGORY_LABELS: Record<string, string> = {
-  retail: 'Retail',
-  healthcare: 'Healthcare',
-  finance: 'Finance',
-  manufacturing: 'Manufacturing',
-  education: 'Education',
-  food: 'Food & Beverage',
-  media: 'Media & Publishing',
-  events: 'Events & Entertainment',
-  technology: 'Technology',
-  general: 'General',
-  school: 'Ontology School: Get Started',
-  fibo: 'FIBO (EDM Council)',
+  retail: '零售',
+  healthcare: '医疗健康',
+  finance: '金融',
+  manufacturing: '制造业',
+  education: '教育',
+  food: '食品饮料',
+  media: '媒体出版',
+  events: '活动娱乐',
+  technology: '科技',
+  general: '通用',
+  school: '本体学校 · 从这里开始',
+  fibo: 'FIBO（EDM 委员会）',
 };
 
 export const CATEGORY_COLORS: Record<string, string> = {
@@ -48,3 +54,7 @@ export const CATEGORY_COLORS: Record<string, string> = {
   school: '#E67E22',
   fibo: '#1A5276',
 };
+
+/** 本地保存条目的分类与来源标识。 */
+export const LOCAL_SOURCE_LABEL = '我的';
+export const LOCAL_SOURCE_COLOR = '#0078D4';

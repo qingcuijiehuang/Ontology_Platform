@@ -1,0 +1,16 @@
+{
+  "dataset": "fourth-coffee.shipments",
+  "source": "Data Lakehouse (bronze)",
+  "table": "lakehouse.bronze.shipments",
+  "entityTypeId": "shipment",
+  "rowCount": 6,
+  "generatedAt": "2026-09-13",
+  "rows": [
+    { "shipment_id": "SHIP-001", "dispatch_date": "2026-08-20", "arrival_date": "2026-08-27", "shipment_status": "Delivered", "weight_kg": 250.5, "supplier_id": "SUPP-001", "store_id": "STORE-001" },
+    { "shipment_id": "SHIP-002", "dispatch_date": "2026-08-24", "arrival_date": "2026-08-31", "shipment_status": "Delivered", "weight_kg": 180.0, "supplier_id": "SUPP-002", "store_id": "STORE-002" },
+    { "shipment_id": "SHIP-003", "dispatch_date": "2026-09-02", "arrival_date": "2026-09-09", "shipment_status": "Delivered", "weight_kg": 320.75, "supplier_id": "SUPP-003", "store_id": "STORE-003" },
+    { "shipment_id": "SHIP-004", "dispatch_date": "2026-09-08", "arrival_date": "2026-09-18", "shipment_status": "In Transit", "weight_kg": 145.25, "supplier_id": "SUPP-004", "store_id": "STORE-004" },
+    { "shipment_id": "SHIP-005", "dispatch_date": "2026-09-01", "arrival_date": "2026-09-14", "shipment_status": "Delayed", "weight_kg": 96.4, "supplier_id": "SUPP-005", "store_id": "STORE-005" },
+    { "shipment_id": "SHIP-006", "dispatch_date": "2026-09-11", "arrival_date": "2026-09-19", "shipment_status": "In Transit", "weight_kg": 210.0, "supplier_id": "SUPP-001", "store_id": "STORE-006" }
+  ]
+}

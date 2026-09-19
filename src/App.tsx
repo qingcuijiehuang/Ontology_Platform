@@ -1,38 +1,36 @@
 import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
 import { AnimatePresence } from 'framer-motion';
-import { 
-  Header, 
-  OntologyGraph, 
-  QuestPanel, 
-  InspectorPanel, 
-  QueryPlayground,
+import {
+  Header,
+  OntologyGraph,
+  InspectorPanel,
   SearchFilter,
-  WelcomeModal,
-  AboutModal,
-  HelpModal,
-  DataSourcesModal,
+  EndpointConnector,
+  LlmConnector,
+  AIQueryConsole,
   ImportExportModal,
-  FabricExportModal,
   GalleryModal,
   OntologySummaryModal,
   OntologyDesigner,
   LearnPage,
-  Toast,
   CommandPalette,
   GuidedTour,
   isTourDismissed,
   AppFooter,
   OntologyStatsPanel,
-  PathFinderPanel
+  PathFinderPanel,
+  InstanceBrowser,
 } from './components';
 import type { CommandItem } from './components';
 import { useAppStore, themeClass, THEME_OPTIONS } from './store/appStore';
 import { useDesignerStore } from './store/designerStore';
 import { useRoute } from './hooks/useRoute';
+import { usePanelResize } from './hooks/usePanelResize';
 import { navigate } from './lib/router';
 import { decodeSharePayload } from './lib/shareCodec';
 import type { Catalogue } from './types/catalogue';
-import { Search, MessageSquare, Info, Compass, LayoutGrid, PenTool, BookOpen, FileJson, HelpCircle, Database, Palette, FileText } from 'lucide-react';
+import { Search, Info, LayoutGrid, PenTool, FileJson, FileText, Sparkles } from 'lucide-react';
+import type { CSSProperties } from 'react';
 import './styles/app.css';
 
 const AI_BUILDER_ENABLED = import.meta.env.VITE_ENABLE_AI_BUILDER === 'true';
@@ -44,33 +42,29 @@ const NLBuilderModal = AI_BUILDER_ENABLED
 function App() {
   const route = useRoute();
 
-  const [showWelcome, setShowWelcome] = useState(false);
   const [showTour, setShowTour] = useState(() => !isTourDismissed());
-  const [showAbout, setShowAbout] = useState(false);
-  const [showHelp, setShowHelp] = useState(false);
   const [showDataSources, setShowDataSources] = useState(false);
   const [showImportExport, setShowImportExport] = useState(false);
   const [showNLBuilder, setShowNLBuilder] = useState(false);
-  const [showFabricExport, setShowFabricExport] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
-  const [toast, setToast] = useState<{ message: string; icon: string } | null>(null);
-  const [mobilePanel, setMobilePanel] = useState<'graph' | 'quests' | 'inspector' | 'query'>('graph');
+  const [showEndpoint, setShowEndpoint] = useState(false);
+  const [showLlm, setShowLlm] = useState(false);
+  const [mobilePanel, setMobilePanel] = useState<'graph' | 'inspector'>('graph');
   const [showCommandPalette, setShowCommandPalette] = useState(false);
-  const { theme, setTheme, earnedBadges, loadOntology } = useAppStore();
+  const { theme, setTheme, currentOntology, loadOntology } = useAppStore();
 
-  // Show toast when a new badge is earned
-  useEffect(() => {
-    if (earnedBadges.length > 0) {
-      const latestBadge = earnedBadges[earnedBadges.length - 1];
-      setToast({
-        message: `Quest Complete! Earned: ${latestBadge.badge}`,
-        icon: latestBadge.icon
-      });
-      
-      const timer = setTimeout(() => setToast(null), 4000);
-      return () => clearTimeout(timer);
-    }
-  }, [earnedBadges]);
+  // ── 右侧栏宽度可拖动 ──────────────────────────────────
+  // 面板在分隔条正方向一侧，所以 reverse：指针左移 = 栏变宽。
+  // 上限按视口动态计算，保证中间图谱区永远留得下至少 ~460px。
+  const sidebarResize = usePanelResize({
+    storageKey: 'right-sidebar-width',
+    initial: typeof window !== 'undefined' && window.innerWidth <= 1200 ? 320 : 360,
+    min: 260,
+    max: () => Math.max(300, window.innerWidth - 460),
+    axis: 'x',
+    reverse: true,
+    label: '拖动调整右侧栏宽度',
+  });
 
   // Deep-link: /#/catalogue/<id> — load a specific ontology from the catalogue
   useEffect(() => {
@@ -127,7 +121,6 @@ function App() {
     // Load the current playground ontology into the designer
     const { currentOntology } = useAppStore.getState();
     useDesignerStore.getState().loadDraft(currentOntology);
-    setShowWelcome(false);
     navigate({ page: 'designer' });
   }, []);
 
@@ -158,7 +151,7 @@ function App() {
       switch (e.key) {
         case '?':
           e.preventDefault();
-          setShowHelp(true);
+          setShowEndpoint(true);
           break;
       }
     };
@@ -168,15 +161,15 @@ function App() {
 
   // ── Command palette items ──────────────────────────────
   const commands = useMemo<CommandItem[]>(() => [
-    { id: 'catalogue', label: 'Open Catalogue', icon: <LayoutGrid size={18} />, action: openGallery },
-    { id: 'designer', label: 'Open Designer', icon: <PenTool size={18} />, action: openDesigner },
-    { id: 'learn', label: 'Open Ontology School', icon: <BookOpen size={18} />, action: openLearn },
-    { id: 'import-export', label: 'Import / Export', icon: <FileJson size={18} />, action: () => setShowImportExport(true) },
-    { id: 'summary', label: 'View Summary', icon: <FileText size={18} />, action: () => setShowSummary(true) },
-    { id: 'about', label: 'About & Trademark Notice', icon: <Info size={18} />, action: () => setShowAbout(true) },
-    { id: 'help', label: 'Help', icon: <HelpCircle size={18} />, shortcut: '?', action: () => setShowHelp(true) },
-    { id: 'data-sources', label: 'Data Sources', icon: <Database size={18} />, action: () => setShowDataSources(true) },
-    { id: 'theme', label: 'Switch Theme', icon: <Palette size={18} />, action: cycleTheme },
+    { id: 'llm', label: '模型连接（大模型 API）', icon: <Sparkles size={18} />, action: () => setShowLlm(true) },
+    { id: 'connect', label: '接入数据源', icon: <LayoutGrid size={18} />, action: () => setShowEndpoint(true) },
+    { id: 'catalogue', label: '打开本体库', icon: <LayoutGrid size={18} />, action: openGallery },
+    { id: 'designer', label: '打开设计器', icon: <PenTool size={18} />, action: openDesigner },
+    { id: 'learn', label: '打开学习中心', icon: <PenTool size={18} />, action: openLearn },
+    { id: 'import-export', label: '导入 / 导出', icon: <FileJson size={18} />, action: () => setShowImportExport(true) },
+    { id: 'summary', label: '查看摘要', icon: <FileText size={18} />, action: () => setShowSummary(true) },
+    { id: 'data-sources', label: '数据源说明', icon: <FileText size={18} />, action: () => setShowDataSources(true) },
+    { id: 'theme', label: '切换主题', icon: <FileText size={18} />, action: cycleTheme },
   ], [openGallery, openDesigner, openLearn, cycleTheme]);
 
   // Full-page views
@@ -188,56 +181,58 @@ function App() {
   }
 
   return (
-    <div className={`app-container ${themeClass(theme)}`}>
-      <Header 
-        onAboutClick={() => setShowAbout(true)}
-        onHelpClick={() => setShowHelp(true)} 
+    <div
+      className={`app-container ${themeClass(theme)}`}
+      style={{ '--right-sidebar-width': `${sidebarResize.size}px` } as CSSProperties}
+    >
+      <Header
         onDataSourcesClick={() => setShowDataSources(true)}
         onImportExportClick={() => setShowImportExport(true)}
         onGalleryClick={openGallery}
         onDesignerClick={openDesigner}
-        onLearnClick={openLearn}
         onNLBuilderClick={AI_BUILDER_ENABLED ? () => setShowNLBuilder(true) : undefined}
         onSummaryClick={() => setShowSummary(true)}
+        onEndpointClick={() => setShowEndpoint(true)}
+        onLlmClick={() => setShowLlm(true)}
       />
-      <QuestPanel />
-      <OntologyGraph />
+
+      {/* 左列：图谱 + 智能检索问答（回答框位于图谱下方） + 页脚 */}
+      <div className="main-column">
+        <OntologyGraph />
+        <AIQueryConsole onOpenModelSettings={() => setShowLlm(true)} />
+        <AppFooter />
+      </div>
+
+      {/* 竖直分隔条：左右拖动调整右侧栏宽度，双击复位 */}
+      <div
+        className={`panel-resizer panel-resizer--vertical ${sidebarResize.dragging ? 'is-dragging' : ''}`}
+        {...sidebarResize.handleProps}
+      />
+
       <div className="right-sidebar">
         <OntologyStatsPanel />
+        <InstanceBrowser ontology={currentOntology} />
         <PathFinderPanel />
         <SearchFilter />
         <InspectorPanel />
-        <QueryPlayground />
       </div>
 
       {/* Mobile bottom tabs — visible only on small screens via CSS */}
       <div className="mobile-panel-tabs">
         <button className={`mobile-tab ${mobilePanel === 'graph' ? 'active' : ''}`} onClick={() => setMobilePanel('graph')}>
-          <Search size={18} /> Graph
-        </button>
-        <button className={`mobile-tab ${mobilePanel === 'quests' ? 'active' : ''}`} onClick={() => setMobilePanel('quests')}>
-          <Compass size={18} /> Quests
+          <Search size={18} /> 图谱与问答
         </button>
         <button className={`mobile-tab ${mobilePanel === 'inspector' ? 'active' : ''}`} onClick={() => setMobilePanel('inspector')}>
-          <Info size={18} /> Inspector
-        </button>
-        <button className={`mobile-tab ${mobilePanel === 'query' ? 'active' : ''}`} onClick={() => setMobilePanel('query')}>
-          <MessageSquare size={18} /> Query
+          <Info size={18} /> 检视
         </button>
       </div>
 
       {/* Mobile panel drawer — visible only on small screens when a panel is selected */}
-      {mobilePanel !== 'graph' && (
+      {mobilePanel === 'inspector' && (
         <div className="mobile-panel-drawer">
-          <button className="mobile-panel-close" onClick={() => setMobilePanel('graph')}>✕ Close</button>
-          {mobilePanel === 'quests' && <QuestPanel />}
-          {mobilePanel === 'inspector' && (
-            <>
-              <SearchFilter />
-              <InspectorPanel />
-            </>
-          )}
-          {mobilePanel === 'query' && <QueryPlayground />}
+          <button className="mobile-panel-close" onClick={() => setMobilePanel('graph')}>✕ 关闭</button>
+          <SearchFilter />
+          <InspectorPanel />
         </div>
       )}
 
@@ -246,27 +241,41 @@ function App() {
       )}
 
       <AnimatePresence>
-        {showWelcome && !showTour && <WelcomeModal onClose={() => setShowWelcome(false)} />}
+        {showEndpoint && <EndpointConnector onClose={() => setShowEndpoint(false)} />}
       </AnimatePresence>
 
       <AnimatePresence>
-        {showAbout && <AboutModal onClose={() => setShowAbout(false)} />}
+        {showLlm && <LlmConnector onClose={() => setShowLlm(false)} />}
       </AnimatePresence>
 
       <AnimatePresence>
-        {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
+        {showDataSources && (
+          <div className="modal-overlay" onClick={() => setShowDataSources(false)}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 520 }}>
+              <h2 style={{ fontSize: 20, fontWeight: 600, marginBottom: 12 }}>数据源说明</h2>
+              <p style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.7, marginBottom: 12 }}>
+                本平台支持 4 种真实数据源接入：
+              </p>
+              <ul style={{ paddingLeft: 18, fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.8 }}>
+                <li><strong>REST API</strong>：从任意 RESTful 接口拉取 JSON 数据；支持自定义 Headers 与超时。</li>
+                <li><strong>SPARQL</strong>：对 RDF 三元组存储执行 SELECT 查询，返回 JSON 结果；自动包裹样本查询。</li>
+                <li><strong>GraphQL</strong>：通过 GraphQL 端点查询，自动解析 data 字段。</li>
+                <li><strong>JSON 文件</strong>：从可访问的 JSON 文件直接加载。</li>
+              </ul>
+              <p style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.7, marginTop: 12 }}>
+                所有请求通过浏览器原生 fetch 发起，跨域（CORS）需在目标服务器放行。
+                数据拉回后会在右侧"实例浏览"中以表格展示，并被自然语言查询自动引用。
+              </p>
+              <div style={{ marginTop: 18, textAlign: 'center' }}>
+                <button className="btn btn-primary" onClick={() => setShowDataSources(false)}>关闭</button>
+              </div>
+            </div>
+          </div>
+        )}
       </AnimatePresence>
 
       <AnimatePresence>
-        {showDataSources && <DataSourcesModal onClose={() => setShowDataSources(false)} />}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {showImportExport && <ImportExportModal onClose={() => setShowImportExport(false)} onFabricPush={() => { setShowImportExport(false); setShowFabricExport(true); }} />}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {showFabricExport && <FabricExportModal onClose={() => setShowFabricExport(false)} />}
+        {showImportExport && <ImportExportModal onClose={() => setShowImportExport(false)} />}
       </AnimatePresence>
 
       <AnimatePresence>
@@ -288,18 +297,12 @@ function App() {
       </AnimatePresence>
 
       <AnimatePresence>
-        {toast && <Toast message={toast.message} icon={toast.icon} />}
-      </AnimatePresence>
-
-      <AnimatePresence>
         <CommandPalette
           open={showCommandPalette}
           onClose={() => setShowCommandPalette(false)}
           commands={commands}
         />
       </AnimatePresence>
-
-      <AppFooter />
     </div>
   );
 }

@@ -1,0 +1,18 @@
+{
+  "dataset": "fourth-coffee.customers",
+  "source": "Data Lakehouse (bronze)",
+  "table": "lakehouse.bronze.customers",
+  "entityTypeId": "customer",
+  "rowCount": 8,
+  "generatedAt": "2026-09-13",
+  "rows": [
+    { "customer_id": "CUST-001", "full_name": "Arif Ramadhan", "email_address": "arif.ramadhan@example.com", "loyalty_status": "Gold", "registration_date": "2024-03-15", "lifetime_value": 1245.5 },
+    { "customer_id": "CUST-002", "full_name": "Jaroslav Cerny", "email_address": "jaroslav.cerny@example.com", "loyalty_status": "Platinum", "registration_date": "2023-01-20", "lifetime_value": 3420.0 },
+    { "customer_id": "CUST-003", "full_name": "Sumber Agvaan", "email_address": "sumber.agvaan@example.com", "loyalty_status": "Bronze", "registration_date": "2025-11-01", "lifetime_value": 89.0 },
+    { "customer_id": "CUST-004", "full_name": "Mei Lin Zhao", "email_address": "meilin.zhao@example.com", "loyalty_status": "Silver", "registration_date": "2024-07-08", "lifetime_value": 640.25 },
+    { "customer_id": "CUST-005", "full_name": "Tomas Lindqvist", "email_address": "tomas.lindqvist@example.com", "loyalty_status": "Gold", "registration_date": "2024-11-22", "lifetime_value": 1512.75 },
+    { "customer_id": "CUST-006", "full_name": "Priya Nair", "email_address": "priya.nair@example.com", "loyalty_status": "Silver", "registration_date": "2025-02-14", "lifetime_value": 388.0 },
+    { "customer_id": "CUST-007", "full_name": "David Okafor", "email_address": "david.okafor@example.com", "loyalty_status": "Bronze", "registration_date": "2025-09-30", "lifetime_value": 52.5 },
+    { "customer_id": "CUST-008", "full_name": "Sofia Marchetti", "email_address": "sofia.marchetti@example.com", "loyalty_status": "Platinum", "registration_date": "2022-05-19", "lifetime_value": 4187.9 }
+  ]
+}

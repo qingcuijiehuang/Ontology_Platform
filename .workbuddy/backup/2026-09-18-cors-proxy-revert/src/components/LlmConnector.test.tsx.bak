@@ -1,0 +1,226 @@
+/**
+ * 「模型连接」弹窗 —— 跨域代理部分的回归测试
+ * ---------------------------------------------------------------------------
+ * 背景：用户把自建网关（api.qingcuicore.com，未开 CORS）填进来后报
+ * `TypeError: Failed to fetch`。这个失败发生在响应到达 JS 之前，页面里
+ * 拿不到状态码，因此必须靠「本地代理」破局。这里锁住三件事：
+ *  1. 「填入本地代理」写入的地址必须与内置代理脚本一致；
+ *  2. 「检测代理」失败时给的是可执行指引，而不是笼统报错；
+ *  3. 已配代理时「测试连接」的失败提示要指向代理，不再让用户去填代理。
+ */
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
+import { LlmConnector } from './LlmConnector';
+import { useAppStore } from '../store/appStore';
+import { DEFAULT_LLM_CONFIG, DEFAULT_LOCAL_PROXY_BASE } from '../data/llmProviders';
+
+const LLM_KEY = 'ontology-platform.llm-config';
+const onClose = vi.fn();
+
+function openAdvanced() {
+  // <details> 收起时内容不可见，但 jsdom 里节点仍在 DOM 中；
+  // 点一下 summary 走一遍真实交互路径，避免测试依赖「DOM 里存在即算通过」。
+  fireEvent.click(screen.getByText(/高级：跨域代理与私有网关/));
+}
+
+describe('LlmConnector · 跨域代理', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    window.localStorage.clear();
+    useAppStore.setState({ llm: { ...DEFAULT_LLM_CONFIG } });
+  });
+
+  it('「填入本地代理」写入内置代理默认地址，并持久化到本地', async () => {
+    const user = userEvent.setup();
+    render(<LlmConnector onClose={onClose} />);
+    openAdvanced();
+
+    await user.click(screen.getByRole('button', { name: /填入本地代理/ }));
+
+    expect(useAppStore.getState().llm.proxyBaseUrl).toBe(DEFAULT_LOCAL_PROXY_BASE);
+    const saved = JSON.parse(window.localStorage.getItem(LLM_KEY) ?? '{}');
+    expect(saved.proxyBaseUrl).toBe(DEFAULT_LOCAL_PROXY_BASE);
+  });
+
+  it('已填写代理时 summary 上显示「已开启」徽标（收起后也能看出开着代理）', async () => {
+    const user = userEvent.setup();
+    render(<LlmConnector onClose={onClose} />);
+    openAdvanced();
+    expect(screen.queryByText('已开启')).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: /填入本地代理/ }));
+    expect(screen.getByText('已开启')).toBeTruthy();
+  });
+
+  it('未填写代理前缀时「检测代理」按钮禁用，不允许打出必然失败的请求', () => {
+    render(<LlmConnector onClose={onClose} />);
+    openAdvanced();
+    const probe = screen.getByRole('button', { name: /检测代理/ }) as HTMLButtonElement;
+    expect(probe.disabled).toBe(true);
+  });
+
+  it('代理未启动时「检测代理」报「无法连接」，把「没起代理」和「Key 不对」区分开', async () => {
+    const user = userEvent.setup();
+    useAppStore.setState({
+      llm: { ...DEFAULT_LLM_CONFIG, apiKey: 'sk-test', model: 'gpt-5.6-sol', proxyBaseUrl: 'http://127.0.0.1:1' },
+    });
+    render(<LlmConnector onClose={onClose} />);
+    openAdvanced();
+
+    await user.click(screen.getByRole('button', { name: /检测代理/ }));
+
+    // 注意不能断言 `npm run llm:proxy` —— 那句命令是常驻的静态提示，
+    // 永远在 DOM 里，拿它当断言等于什么都没测。
+    expect(await screen.findByText(/无法连接/)).toBeTruthy();
+  });
+
+  it('代理在跑时「检测代理」报成功', async () => {
+    const server = createServer((_req, res) => {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, service: 'llm-cors-proxy' }));
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', () => resolve()));
+    const port = (server.address() as AddressInfo).port;
+
+    try {
+      const user = userEvent.setup();
+      useAppStore.setState({
+        llm: { ...DEFAULT_LLM_CONFIG, apiKey: 'sk-test', model: 'gpt-5.6-sol', proxyBaseUrl: `http://127.0.0.1:${port}` },
+      });
+      render(<LlmConnector onClose={onClose} />);
+      openAdvanced();
+
+      await user.click(screen.getByRole('button', { name: /检测代理/ }));
+
+      expect(await screen.findByText(/运行正常/)).toBeTruthy();
+    } finally {
+      await new Promise<void>((resolve) => { server.closeAllConnections(); server.close(() => resolve()); });
+    }
+  });
+
+  it('改代理地址会清掉上一次的检测结果，避免过期结论误导', async () => {
+    const user = userEvent.setup();
+    useAppStore.setState({
+      llm: { ...DEFAULT_LLM_CONFIG, apiKey: 'sk-test', model: 'gpt-5.6-sol', proxyBaseUrl: 'http://127.0.0.1:1' },
+    });
+    render(<LlmConnector onClose={onClose} />);
+    openAdvanced();
+
+    await user.click(screen.getByRole('button', { name: /检测代理/ }));
+    expect(await screen.findByText(/无法连接/)).toBeTruthy();
+
+    const input = screen.getByDisplayValue('http://127.0.0.1:1');
+    fireEvent.change(input, { target: { value: 'http://127.0.0.1:9999' } });
+
+    await waitFor(() => {
+      expect(screen.queryByText(/无法连接/)).toBeNull();
+    });
+  });
+});
+
+describe('LlmConnector · 已配代理时的连接失败归因', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    window.localStorage.clear();
+    // 模拟「网关没开 CORS」：预检被拒时浏览器在响应到达 JS 之前就抛
+    // TypeError。jsdom 不做 CORS 检查，所以直接把 fetch 打回失败态。
+    vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new TypeError('Failed to fetch'))));
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('已填代理仍失败 → 自动探测并给出确定结论（不让用户自己去点「检测代理」猜）', async () => {
+    const user = userEvent.setup();
+    useAppStore.setState({
+      llm: {
+        ...DEFAULT_LLM_CONFIG,
+        apiKey: 'sk-test',
+        model: 'gpt-5.6-sol',
+        baseUrl: 'https://api.qingcuicore.com/v1',
+        proxyBaseUrl: 'http://127.0.0.1:8787',
+      },
+    });
+    render(<LlmConnector onClose={onClose} />);
+
+    await user.click(screen.getByRole('button', { name: /测试连接/ }));
+
+    // 关键改进：不再只说「请确认代理已启动、请点检测代理」，而是自动探完直接报结论
+    expect(await screen.findByText(/已自动检测：无法连接 http:\/\/127\.0\.0\.1:8787/)).toBeTruthy();
+    // 不能出现「去填代理」那套引导，否则用户方向被带偏
+    expect(screen.queryByText(/启动零依赖本地代理/)).toBeNull();
+  });
+
+  it('自动诊断的结果会同步到「检测代理」面板，两处不会给出互相打架的结论', async () => {
+    const user = userEvent.setup();
+    useAppStore.setState({
+      llm: {
+        ...DEFAULT_LLM_CONFIG,
+        apiKey: 'sk-test',
+        model: 'gpt-5.6-sol',
+        baseUrl: 'https://api.qingcuicore.com/v1',
+        proxyBaseUrl: 'http://127.0.0.1:8787',
+      },
+    });
+    render(<LlmConnector onClose={onClose} />);
+
+    await user.click(screen.getByRole('button', { name: /测试连接/ }));
+    await screen.findByText(/已自动检测：无法连接/);
+
+    // 只探一次，结果同时喂给面板 —— 否则用户会看到「测试连接说连不上、检测代理说正常」
+    expect(screen.getAllByText(/无法连接 http:\/\/127\.0\.0\.1:8787/).length).toBeGreaterThan(1);
+  });
+
+  it('代理前缀误带路径 → 当场提示，不必等请求失败', async () => {
+    useAppStore.setState({
+      llm: { ...DEFAULT_LLM_CONFIG, apiKey: 'sk-test', model: 'gpt-5.6-sol' },
+    });
+    render(<LlmConnector onClose={onClose} />);
+    openAdvanced();
+
+    fireEvent.change(screen.getByPlaceholderText(DEFAULT_LOCAL_PROXY_BASE), {
+      target: { value: 'http://127.0.0.1:8787/llm' },
+    });
+
+    expect(await screen.findByText(/代理前缀不要带路径/)).toBeTruthy();
+  });
+
+  it('代理前缀漏写 http:// 时按补全后的地址展示，并明确告诉用户用了哪个地址', async () => {
+    useAppStore.setState({
+      llm: { ...DEFAULT_LLM_CONFIG, apiKey: 'sk-test', model: 'gpt-5.6-sol' },
+    });
+    render(<LlmConnector onClose={onClose} />);
+    openAdvanced();
+
+    // `127.0.0.1:8787` 这种写法过去会拼出非法 URL，fetch 直接抛 Failed to fetch
+    fireEvent.change(screen.getByPlaceholderText(DEFAULT_LOCAL_PROXY_BASE), {
+      target: { value: '127.0.0.1:8787' },
+    });
+
+    // 写法被自动修正 → 不该再报「不要带路径」之类的错
+    expect(screen.queryByText(/代理前缀不要带路径/)).toBeNull();
+    expect(await screen.findByText(/http:\/\/127\.0\.0\.1:8787\/https:\/\//)).toBeTruthy();
+  });
+
+  it('未填代理时失败 → 提示引导启动代理并说明浏览器端无法绕过', async () => {
+    const user = userEvent.setup();
+    useAppStore.setState({
+      llm: {
+        ...DEFAULT_LLM_CONFIG,
+        apiKey: 'sk-test',
+        model: 'gpt-5.6-sol',
+        baseUrl: 'https://api.qingcuicore.com/v1',
+        proxyBaseUrl: '',
+      },
+    });
+    render(<LlmConnector onClose={onClose} />);
+
+    await user.click(screen.getByRole('button', { name: /测试连接/ }));
+
+    expect(await screen.findByText(/无法绕过/)).toBeTruthy();
+  });
+});

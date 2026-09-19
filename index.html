@@ -1,29 +1,42 @@
 <!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='10' fill='%230078D4'/><text y='70' x='50' text-anchor='middle' font-size='60'>☕</text></svg>" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="description" content="Explore ontologies through interactive graphs, RDF tooling, and hands-on learning paths." />
-    <meta name="theme-color" content="#0078D4" />
-    <meta property="og:title" content="Ontology Playground (Preview)" />
-    <meta property="og:description" content="Learn ontology concepts with interactive graphs, relationships, RDF import/export, and curated examples." />
-    <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://microsoft.github.io/Ontology-Playground/" />
-    <meta property="og:image" content="https://microsoft.github.io/Ontology-Playground/og-image.png" />
-    <meta property="og:image:width" content="1200" />
-    <meta property="og:image:height" content="630" />
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Ontology Playground (Preview)" />
-    <meta name="twitter:description" content="Learn ontology concepts with interactive graphs, relationships, RDF import/export, and curated examples." />
-    <meta name="twitter:image" content="https://microsoft.github.io/Ontology-Playground/og-image.png" />
-    <title>Ontology Playground (Preview) | Interactive Ontology Explorer</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Cascadia+Code&display=swap" rel="stylesheet">
+<html lang="zh-CN" data-page-node-id="UhCnP7rWiVZWAHJfPiGDIC">
+  <head data-page-node-id="gCXir0q8F3S9K83q9hJNJs">
+    <meta charset="UTF-8" data-page-node-id="N5iiqJVTe91hyYx2NmDfmd" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20100%20100'%3E%3Crect%20width='100'%20height='100'%20rx='10'%20fill='%230078D4'/%3E%3Ctext%20y='70'%20x='50'%20text-anchor='middle'%20font-size='60'%3E%E2%98%95%3C/text%3E%3C/svg%3E" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" data-page-node-id="zDi5Sw5jjOmITbPF12gEsi" />
+    <meta name="description" content="本体平台：导入 RDF / SPARQL / REST 数据库，对真实数据本体进行检索与可视化。" data-page-node-id="0hGj9enuzqRPBGLgkEz1PK" />
+    <meta name="theme-color" content="#0078D4" data-page-node-id="tVmiXevPt2eKskbHsbMqgT" />
+    <meta property="og:title" content="本体平台 · 接入真实 RDF / 数据库的本体检索" data-page-node-id="NxiyZ2tdE6Or5RHgY2fhV5" />
+    <meta property="og:description" content="导入 RDF 文件或真实数据源，对企业本体进行交互式图谱浏览、自然语言查询与数据检索。" data-page-node-id="vyO58Ea89nWxE3uUYMPsB1" />
+    <meta property="og:type" content="website" data-page-node-id="glNhE1pupTaF5cGZqBjvbZ" />
+    <meta name="twitter:card" content="summary_large_image" data-page-node-id="7wVWibJY3gwlZN7UDeB95d" />
+    <meta name="twitter:title" content="本体平台 · 接入真实 RDF / 数据库的本体检索" data-page-node-id="HQY8gRMxDc7pcizLYfgUUv" />
+    <meta name="twitter:description" content="导入 RDF 文件或真实数据源，对企业本体进行交互式图谱浏览、自然语言查询与数据检索。" data-page-node-id="3AYxSRfrvoHFUR7fp3Kur0" />
+    <title>本体平台 · 接入真实 RDF / 数据库</title>
+    <script>
+      // Apply the stored theme before first paint so a light-mode user never
+      // sees a dark flash. Mirrors themeClass() in src/store/appStore.ts.
+      (function () {
+        try {
+          var stored = localStorage.getItem('theme');
+          if (!stored) {
+            stored = localStorage.getItem('darkMode') === 'true' ? 'dark' : 'light';
+          }
+          var root = document.documentElement;
+          if (stored === 'light') root.classList.add('light-theme');
+          else if (stored === 'crimson') root.classList.add('light-theme', 'theme-crimson');
+          else if (stored === 'aurora') root.classList.add('theme-aurora');
+        } catch (e) {
+          /* private mode / storage disabled: keep the default light theme */
+        }
+      })();
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" data-page-node-id="Zl27TpemfXCxap1A8ULHG0">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin data-page-node-id="vGSFvTKMyQGWIdBB2NftCT">
+    <link href="https://fonts.googleapis.com/css2?family=Cascadia+Code&display=swap" rel="stylesheet" data-page-node-id="maJS1B1KG6JmucCNllw6EV">
   </head>
-  <body>
-    <div id="root"></div>
+  <body data-page-node-id="x0TiFo2G5HJUdEyKDIiKvI">
+    <div id="root" data-page-node-id="54Fd1UC0jfLWNQJDIzfwvm"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

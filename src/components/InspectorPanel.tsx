@@ -3,16 +3,8 @@ import { useAppStore } from '../store/appStore';
 import { Database, ArrowRight, Key, Link2, Layers, Box, GitBranch } from 'lucide-react';
 
 export function InspectorPanel() {
-  const { currentOntology, dataBindings, selectedEntityId, selectedRelationshipId, showDataBindings, activeQuest, currentStepIndex, advanceQuestStep } = useAppStore();
+  const { currentOntology, dataBindings, selectedEntityId, selectedRelationshipId, showDataBindings } = useAppStore();
   const panelRef = useRef<HTMLDivElement>(null);
-
-  const tryAdvancePropertyQuestStep = (propertyName: string) => {
-    if (!activeQuest) return;
-    const currentStep = activeQuest.steps[currentStepIndex];
-    if (currentStep.targetType === 'property' && currentStep.targetId === propertyName) {
-      advanceQuestStep();
-    }
-  };
 
   useEffect(() => {
     if ((selectedEntityId || selectedRelationshipId) && panelRef.current) {
@@ -24,13 +16,13 @@ export function InspectorPanel() {
     return (
       <div ref={panelRef} className="inspector-panel">
         <div className="panel-header">
-          <h3 className="panel-title">Inspector</h3>
+          <h3 className="panel-title">检视器</h3>
         </div>
         <div className="inspector-empty">
           <div className="inspector-empty-icon">🔍</div>
-          <div className="inspector-empty-title">Select an Element</div>
+          <div className="inspector-empty-title">请选择一个元素</div>
           <div className="inspector-empty-text">
-            Click on an entity type or relationship in the graph to inspect its properties, data bindings, and connections.
+            点击图谱中的实体类型或关系，可以查看其属性、数据绑定和连接信息。
           </div>
         </div>
       </div>
@@ -47,7 +39,7 @@ export function InspectorPanel() {
     return (
       <div ref={panelRef} className="inspector-panel">
         <div className="panel-header">
-          <h3 className="panel-title">Relationship</h3>
+          <h3 className="panel-title">关系</h3>
         </div>
         <div className="inspector-content">
           <div className="relationship-header">
@@ -78,7 +70,7 @@ export function InspectorPanel() {
           <div className="inspector-section">
             <div className="section-title">
               <Layers size={14} />
-              Cardinality
+              基数 (Cardinality)
             </div>
             <div className="cardinality-badge">{relationship.cardinality}</div>
           </div>
@@ -87,7 +79,7 @@ export function InspectorPanel() {
             <div className="inspector-section">
               <div className="section-title">
                 <Box size={14} />
-                Relationship Attributes
+                关系属性
               </div>
               <div className="property-list">
                 {relationship.attributes.map(attr => (
@@ -117,7 +109,7 @@ export function InspectorPanel() {
   return (
     <div ref={panelRef} className="inspector-panel">
       <div className="panel-header">
-        <h3 className="panel-title">Entity Type</h3>
+        <h3 className="panel-title">实体类型</h3>
       </div>
       <div className="inspector-content">
         <div className="entity-header">
@@ -133,14 +125,14 @@ export function InspectorPanel() {
         <div className="inspector-section">
           <div className="section-title">
             <Key size={14} />
-            Properties ({entity.properties.length})
+            属性 ({entity.properties.length})
           </div>
           <div className="property-list">
             {entity.properties.map(prop => (
-              <div key={prop.name} className="property-item" style={{ cursor: 'pointer' }} onClick={() => tryAdvancePropertyQuestStep(prop.name)}>
+              <div key={prop.name} className="property-item">
                 <div>
                   <span className="property-name">{prop.name}</span>
-                  {prop.isIdentifier && <span className="property-identifier">ID</span>}
+                  {prop.isIdentifier && <span className="property-identifier">主键</span>}
                   {prop.unit && <span className="property-type" style={{ marginLeft: 8 }}>({prop.unit})</span>}
                 </div>
                 <span className="property-type">{prop.type}</span>
@@ -152,14 +144,14 @@ export function InspectorPanel() {
         <div className="inspector-section">
           <div className="section-title">
             <GitBranch size={14} />
-            Relationships ({entityRelationships.length})
+            关联关系 ({entityRelationships.length})
           </div>
           <div className="property-list">
             {entityRelationships.map(rel => {
               const isOutgoing = rel.from === selectedEntityId;
               const otherEntityId = isOutgoing ? rel.to : rel.from;
               const otherEntity = currentOntology.entityTypes.find(e => e.id === otherEntityId);
-              
+
               return (
                 <div key={rel.id} className="property-item rel-item">
                   <div className="rel-item-row">
@@ -188,7 +180,7 @@ export function InspectorPanel() {
           <div className="inspector-section">
             <div className="section-title">
               <Link2 size={14} />
-              Data Bindings
+              数据绑定
             </div>
             <div className="binding-card">
               <div className="binding-source">
@@ -205,8 +197,6 @@ export function InspectorPanel() {
                   <div
                     key={prop}
                     className="column-mapping"
-                    style={{ cursor: 'pointer' }}
-                    onClick={() => tryAdvancePropertyQuestStep(prop)}
                   >
                     <span className="column-property">{prop}</span>
                     <span className="column-arrow">→</span>

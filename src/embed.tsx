@@ -6,7 +6,7 @@
  *   data-catalogue-id="official/cosmic-coffee"  — load from catalogue.json
  *   data-ontology-url="https://…/my.rdf"        — fetch an RDF or JSON file
  *   data-ontology-inline="<base64-encoded JSON>" — inline ontology JSON
- *   data-theme="dark" | "light"                  — color theme (default: dark)
+ *   data-theme="dark" | "light"                  — color theme (default: light)
  *   data-height="500px"                          — container height
  *   data-catalogue-base-url="https://…/"         — base URL for catalogue.json
  */
@@ -25,7 +25,7 @@ function initEmbeds() {
       catalogueId: el.dataset.catalogueId,
       ontologyUrl: el.dataset.ontologyUrl,
       ontologyInline: el.dataset.ontologyInline,
-      theme: (el.dataset.theme as 'dark' | 'light') || 'dark',
+      theme: (el.dataset.theme as 'dark' | 'light') || 'light',
       height: el.dataset.height || '500px',
       catalogueBaseUrl: el.dataset.catalogueBaseUrl,
     };

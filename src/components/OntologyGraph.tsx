@@ -61,25 +61,10 @@ export function OntologyGraph() {
     highlightedRelationships,
     selectEntity,
     selectRelationship,
-    activeQuest,
-    currentStepIndex,
-    advanceQuestStep,
     darkMode,
     theme
   } = useAppStore();
 
-  // Use refs for quest state to avoid re-creating the graph when quest changes
-  const activeQuestRef = useRef(activeQuest);
-  const currentStepIndexRef = useRef(currentStepIndex);
-  const advanceQuestStepRef = useRef(advanceQuestStep);
-  
-  // Keep refs in sync
-  useEffect(() => {
-    activeQuestRef.current = activeQuest;
-    currentStepIndexRef.current = currentStepIndex;
-    advanceQuestStepRef.current = advanceQuestStep;
-  }, [activeQuest, currentStepIndex, advanceQuestStep]);
-  
   // Theme-aware colors, sourced from the active theme's CSS variables so each
   // theme (including the derived ones) renders with its own graph palette.
   const [themeColors, setThemeColors] = useState<GraphColors>(() => readGraphColors(darkMode));
@@ -264,31 +249,11 @@ export function OntologyGraph() {
     cy.on('tap', 'node', (evt: EventObject) => {
       const nodeId = evt.target.id();
       selectEntity(nodeId);
-      
-      // Check if this advances a quest step (use refs to avoid re-creating graph)
-      const quest = activeQuestRef.current;
-      const stepIndex = currentStepIndexRef.current;
-      if (quest) {
-        const currentStep = quest.steps[stepIndex];
-        if (currentStep.targetType === 'entity' && currentStep.targetId === nodeId) {
-          advanceQuestStepRef.current();
-        }
-      }
     });
 
     cy.on('tap', 'edge', (evt: EventObject) => {
       const edgeId = evt.target.id();
       selectRelationship(edgeId);
-      
-      // Check if this advances a quest step (use refs to avoid re-creating graph)
-      const quest = activeQuestRef.current;
-      const stepIndex = currentStepIndexRef.current;
-      if (quest) {
-        const currentStep = quest.steps[stepIndex];
-        if (currentStep.targetType === 'relationship' && currentStep.targetId === edgeId) {
-          advanceQuestStepRef.current();
-        }
-      }
     });
 
     cy.on('tap', (evt: EventObject) => {
@@ -358,6 +323,66 @@ export function OntologyGraph() {
   useEffect(() => {
     focusNodeIdRef.current = focusNodeId;
   }, [focusNodeId]);
+
+  /**
+   * 容器尺寸变化时同步 Cytoscape 画布尺寸。
+   * ------------------------------------------------------------------
+   * 触发场景：窗口缩放、拖动右侧栏宽度、拖动问答面板高度、面板折叠展开。
+   * 不调用 `cy.resize()` 的话，canvas 仍按旧尺寸渲染 —— 表现为节点被裁掉、
+   * 空白区域无法点击。
+   *
+   * `resize()` 每次尺寸变化都立刻调（便宜且保证渲染正确）；
+   * `fit()` 做 160ms 防抖，只在拖动停下来之后把内容重新收进视野，
+   * 避免拖动过程中缩放反复跳动。
+   */
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container || typeof ResizeObserver === 'undefined') return;
+
+    let lastW = 0;
+    let lastH = 0;
+    let fitTimer: number | undefined;
+    let firstObservation = true;
+
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+      const width = Math.round(entry.contentRect.width);
+      const height = Math.round(entry.contentRect.height);
+      if (width === lastW && height === lastH) return;
+      lastW = width;
+      lastH = height;
+      if (width === 0 || height === 0) return;
+
+      const cy = getCy();
+      if (!cy) return;
+      try {
+        cy.resize();
+      } catch {
+        return; // 实例可能已销毁
+      }
+
+      // 首次观察通常是挂载，此时初始化布局自己会 fit，不必重复
+      if (firstObservation) {
+        firstObservation = false;
+        return;
+      }
+      if (fitTimer !== undefined) window.clearTimeout(fitTimer);
+      fitTimer = window.setTimeout(() => {
+        const live = getCy();
+        if (!live) return;
+        try {
+          live.fit(undefined, 60);
+        } catch { /* ignore */ }
+      }, 160);
+    });
+
+    observer.observe(container);
+    return () => {
+      observer.disconnect();
+      if (fitTimer !== undefined) window.clearTimeout(fitTimer);
+    };
+  }, [getCy]);
 
   // Re-apply focus neighbourhood when focusNodeId changes
   useEffect(() => {

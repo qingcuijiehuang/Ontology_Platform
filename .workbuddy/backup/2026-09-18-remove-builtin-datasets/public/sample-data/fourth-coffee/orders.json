@@ -1,0 +1,20 @@
+{
+  "dataset": "fourth-coffee.orders",
+  "source": "Data Lakehouse (silver)",
+  "table": "lakehouse.silver.orders",
+  "entityTypeId": "order",
+  "rowCount": 10,
+  "generatedAt": "2026-09-13",
+  "rows": [
+    { "order_id": "ORD-2026-1001", "order_timestamp": "2026-09-11T08:12:00", "order_total": 12.5, "order_status": "Completed", "payment_type": "Mobile", "customer_id": "CUST-001", "store_id": "STORE-001" },
+    { "order_id": "ORD-2026-1002", "order_timestamp": "2026-09-11T08:40:00", "order_total": 8.75, "order_status": "Completed", "payment_type": "Card", "customer_id": "CUST-004", "store_id": "STORE-002" },
+    { "order_id": "ORD-2026-1003", "order_timestamp": "2026-09-12T09:05:00", "order_total": 21.4, "order_status": "Completed", "payment_type": "Gift Card", "customer_id": "CUST-002", "store_id": "STORE-001" },
+    { "order_id": "ORD-2026-1004", "order_timestamp": "2026-09-12T12:26:00", "order_total": 5.25, "order_status": "Completed", "payment_type": "Cash", "customer_id": "CUST-007", "store_id": "STORE-003" },
+    { "order_id": "ORD-2026-1005", "order_timestamp": "2026-09-12T15:48:00", "order_total": 14.0, "order_status": "Cancelled", "payment_type": "Card", "customer_id": "CUST-006", "store_id": "STORE-002" },
+    { "order_id": "ORD-2026-1006", "order_timestamp": "2026-09-13T07:58:00", "order_total": 9.9, "order_status": "Completed", "payment_type": "Mobile", "customer_id": "CUST-005", "store_id": "STORE-001" },
+    { "order_id": "ORD-2026-1007", "order_timestamp": "2026-09-13T09:31:00", "order_total": 17.6, "order_status": "Ready", "payment_type": "Mobile", "customer_id": "CUST-008", "store_id": "STORE-004" },
+    { "order_id": "ORD-2026-1008", "order_timestamp": "2026-09-13T10:02:00", "order_total": 6.5, "order_status": "Preparing", "payment_type": "Cash", "customer_id": "CUST-003", "store_id": "STORE-003" },
+    { "order_id": "ORD-2026-1009", "order_timestamp": "2026-09-13T10:44:00", "order_total": 23.15, "order_status": "Pending", "payment_type": "Card", "customer_id": "CUST-002", "store_id": "STORE-002" },
+    { "order_id": "ORD-2026-1010", "order_timestamp": "2026-09-13T11:19:00", "order_total": 4.5, "order_status": "Completed", "payment_type": "Mobile", "customer_id": "CUST-001", "store_id": "STORE-004" }
+  ]
+}

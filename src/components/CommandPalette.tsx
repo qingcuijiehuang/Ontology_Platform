@@ -108,7 +108,7 @@ export function CommandPalette({ open, onClose, commands }: CommandPaletteProps)
             ref={inputRef}
             className="command-palette-input"
             type="text"
-            placeholder="Type a command…"
+            placeholder="输入命令…"
             value={query}
             onChange={e => setQuery(e.target.value)}
           />
@@ -116,7 +116,7 @@ export function CommandPalette({ open, onClose, commands }: CommandPaletteProps)
         </div>
         <div className="command-palette-list" ref={listRef}>
           {filtered.length === 0 && (
-            <div className="command-palette-empty">No matching commands</div>
+            <div className="command-palette-empty">没有匹配的命令</div>
           )}
           {filtered.map((cmd, i) => (
             <button
@@ -132,9 +132,9 @@ export function CommandPalette({ open, onClose, commands }: CommandPaletteProps)
           ))}
         </div>
         <div className="command-palette-footer">
-          <span><Command size={12} /> <span>K</span> to open</span>
-          <span>↑↓ navigate</span>
-          <span>↵ select</span>
+          <span><Command size={12} /> <span>K</span> 打开</span>
+          <span>↑↓ 浏览</span>
+          <span>↵ 确认</span>
         </div>
       </motion.div>
     </motion.div>

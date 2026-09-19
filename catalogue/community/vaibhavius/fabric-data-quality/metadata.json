@@ -1,6 +1,6 @@
 {
   "name": "Fabric Data Quality Ontology",
-  "description": "Models the lifecycle of data quality issues within a Microsoft Fabric environment by capturing issue reporting, root cause analysis, ownership, resolution actions, validation processes, and downstream business impacts across data pipelines, lakehouses, semantic models, and reporting assets.",
+  "description": "建模 Microsoft Fabric 环境中数据质量问题的生命周期，涵盖问题上报、根因分析、责任归属、解决措施、校验流程，以及跨数据管道、湖仓、语义模型与报表资产的下游业务影响。",
   "icon": "📦",
   "category": "technology",
   "tags": [

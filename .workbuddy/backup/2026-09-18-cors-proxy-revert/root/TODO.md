@@ -1,0 +1,617 @@
+# Ontology Playground — Feature Roadmap
+
+> The goal: build the best community resource site for learning about ontologies
+> and Microsoft Fabric IQ Ontologies. Fully static, deployable to Azure Static
+> Web Apps or GitHub Pages.
+
+---
+
+## 1. RDF Import / Export (with full test coverage)
+
+The current RDF export is inline in `ImportExportModal.tsx` and there is no RDF
+**import**. RDF should become a first-class serialization format.
+
+### 1.1 Extract RDF serialization module
+- [x] Create `src/lib/rdf/serializer.ts` — move the existing `exportAsRDF()`
+  logic out of `ImportExportModal.tsx` into a pure function
+  `serializeToRDF(ontology, bindings) → string`
+- [x] Create `src/lib/rdf/parser.ts` — implement `parseRDF(rdfXmlString) →
+  { ontology, bindings }` using a lightweight XML parser (browser
+  `DOMParser`; no heavy deps)
+- [x] Support OWL classes → EntityTypes, DatatypeProperties → Properties,
+  ObjectProperties → Relationships
+- [x] Round-trip fidelity: `parse(serialize(ontology))` must produce an
+  equivalent ontology
+
+### 1.2 Wire RDF import into UI
+- [x] In `ImportExportModal.tsx`, accept `.rdf` and `.owl` files in the file
+  input
+- [x] Detect format by extension and/or XML prologue, route to the RDF parser
+- [x] Show validation errors inline if the RDF is malformed
+
+### 1.3 Full test battery
+- [x] Set up Vitest (`vitest`, `@testing-library/react`,
+  `@testing-library/jest-dom`)
+- [x] Unit tests for `serializer.ts`:
+  - Empty ontology
+  - Ontology with all property types (string, integer, decimal, date, etc.)
+  - Ontology with relationship attributes
+  - XML special character escaping (& < > " ')
+  - Data bindings preservation in comments
+- [x] Unit tests for `parser.ts`:
+  - Valid RDF/OWL input → correct Ontology shape
+  - Missing required fields → descriptive error
+  - Namespace handling (custom prefixes, default namespace)
+  - Malformed XML → graceful error
+  - External RDF/XML dialects: `rdf:Description` + `rdf:type`, bare
+    `<owl:Ontology>` root, legacy `owl` namespace without `#`, `rdfs:Class`
+  - Non-XML syntaxes (Turtle / JSON-LD) get a "how to convert" hint instead
+    of a generic parse failure
+  - Instance-only documents are reported as data, not as an empty ontology
+- [x] Round-trip tests: serialize → parse → deep-equal for every sample ontology
+  in `sampleOntologies.ts` and `cosmicCoffeeOntology`
+- [x] Integration test: import an RDF file via the modal, verify store state
+- [x] Add `"test": "vitest run"` and `"test:watch": "vitest"` to
+  `package.json` scripts
+
+---
+
+## 2. Fully static site (Azure Static Web Apps + GitHub Pages)
+
+The app currently proxies `/api` to an Azure Functions backend. The site must
+work as a pure static build with zero server-side dependencies. Azure SWA is
+the **primary** deployment target; GitHub Pages support is for forks.
+
+### 2.1 Remove runtime API dependency
+- [x] The Azure OpenAI feature is already behind `VITE_ENABLE_AI_BUILDER` —
+  confirm the build produces zero `/api` calls when the flag is off
+- [x] Audit all `fetch()` calls; ensure none target a dynamic backend when
+  running in static mode
+- [x] Guard the Vite dev proxy (`server.proxy`) behind `VITE_ENABLE_AI_BUILDER`
+  so it doesn't confuse static deployments
+
+### 2.2 Azure Static Web Apps (primary)
+The existing workflow
+`.github/workflows/azure-static-web-apps-green-plant-0bb1d2910.yml` handles
+build + deploy. Adapt it for the new build pipeline:
+- [x] Add `npm run catalogue:build` step before the SWA deploy action (once
+  §3.2 is done)
+- [x] Verify `staticwebapp.config.json` is correct for the static-only build
+  (remove `api_location` if the API feature flag is off)
+- [x] Ensure the `output_location: "build"` matches Vite's `outDir`
+- [x] Keep the existing PR preview environment support (staging URLs on PRs)
+
+### 2.3 GitHub Pages (for forks)
+- [x] Add a **separate** GitHub Actions workflow
+  `.github/workflows/deploy-ghpages.yml`:
+  - Trigger on push to `main`
+  - `npm ci && npm run catalogue:build && npm run build`
+  - Deploy `build/` via `actions/deploy-pages`
+  - Disabled by default (forks enable it by setting the Pages source)
+- [x] Set `base` in `vite.config.ts` dynamically from an env var
+  (`VITE_BASE_PATH`) so it works at `/` (Azure SWA) and
+  `/<repo-name>/` (GitHub Pages)
+- [x] Copy `index.html` → `build/404.html` for SPA fallback on GitHub Pages
+- [x] Document both deployment paths in README
+
+---
+
+## 3. Ontology catalogue — official + community contributed
+
+A curated + community-driven catalogue of ontologies, compiled at build time
+into a static JSON file.
+
+### 3.1 Catalogue file structure
+- [x] Create `catalogue/` directory at repo root
+- [x] Define a folder convention:
+  ```
+  catalogue/
+    official/
+      cosmic-coffee.rdf
+      e-commerce.rdf
+      ...
+    community/
+      <github-username>/
+        <ontology-slug>.rdf
+        metadata.json    ← { name, description, author, tags, ... }
+  ```
+- [x] Create a JSON Schema for `metadata.json` to validate contributions
+- [x] Existing sample ontologies in `src/data/sampleOntologies.ts` should be
+  migrated to `catalogue/official/` as RDF files with metadata
+
+### 3.2 Build-time catalogue compilation
+- [x] Write a build script (`scripts/compile-catalogue.ts`) that:
+  1. Reads all `catalogue/**/*.rdf` files
+  2. Parses each via the RDF parser from §1
+  3. Reads associated `metadata.json`
+  4. Emits `public/catalogue.json` — a single JSON file with all ontologies,
+     metadata, and category info
+- [x] Add an npm script: `"catalogue:build": "tsx scripts/compile-catalogue.ts"`
+- [x] Integrate into `npm run build`:
+  `"build": "npm run catalogue:build && tsc -b && vite build"`
+- [x] On build failure (invalid RDF, missing metadata), fail loudly with a
+  helpful error message
+
+### 3.3 Community contribution workflow (Microsoft OSS conventions)
+- [x] Add `LICENSE` file — **MIT License** (standard for Microsoft OSS projects)
+- [x] Add `CONTRIBUTING.md` following the
+  [Microsoft Open Source Contributing Guide](https://opensource.microsoft.com/contributing/):
+  - Contributor License Agreement (CLA) requirement — add the
+    [Microsoft CLA bot](https://cla.opensource.microsoft.com/) to the repo
+  - Fork → add RDF + `metadata.json` under `catalogue/community/<username>/`
+  - Open PR → CI validates the RDF and metadata schema
+  - On merge, the next build includes the new ontology
+- [x] Add `CODE_OF_CONDUCT.md` — use the
+  [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/)
+- [x] Add `SECURITY.md` — use the
+  [Microsoft Security Policy template](https://github.com/microsoft/repo-templates/blob/main/shared/SECURITY.md)
+- [x] Add a GitHub Actions CI job that validates PRs touching `catalogue/`:
+  - Parse RDF, verify round-trip, check metadata schema
+  - Run the full test suite
+- [ ] Consider also accepting GitHub Gist URLs in `metadata.json`
+  (`"source": "gist:<gist-id>"`) and fetching them at build time
+  (optional, evaluate complexity vs. value)
+- [x] **RDF validation in CI** — use `npm run validate` (backed by
+  `scripts/validate-rdf.ts`) in a GitHub Actions step to gate community
+  PRs. The script already validates all catalogue RDF files and can
+  validate specific files via `npm run validate -- path/to/file.rdf`.
+  Wire it into the PR validation workflow so invalid ontologies are
+  rejected before merge.
+- [ ] **Contribution CTA link** — Add a "Want to contribute? See
+  CONTRIBUTING.md" button/link in the gallery or footer that points
+  directly to the GitHub repo fork/PR flow. Link should be:
+  `https://github.com/microsoft/Ontology-Playground/fork` (for forking)
+  or the CONTRIBUTING.md file, so contributors can start the process
+  without manual navigation.
+
+### 3.4 Catalogue UI (upgrade GalleryModal)
+- [x] Refactor `GalleryModal` to load from `catalogue.json` instead of
+  hardcoded `sampleOntologies.ts`
+- [x] Add category filters: Official / Community, plus domain tags (retail,
+  healthcare, etc.)
+- [x] Add search/filter by name, author, tags
+- [x] Show author + contributor info for community ontologies
+- [x] Add "View RDF source" button for each ontology (links to the raw file
+  in the repo or displays inline)
+- [x] Add pagination or virtual scroll if the catalogue grows large
+- [x] Localise the catalogue to Chinese: UI labels (search, filters, "show
+  more", footer, card tooltips), `CATEGORY_LABELS`, and all 71 entry
+  descriptions in `catalogue/*/*/metadata.json`. Ontology / entity / property
+  names stay as authored in the RDF so ids, search and export are unaffected.
+
+---
+
+## 4. Embeddable ontology widget
+
+Allow embedding an interactive ontology viewer in external pages (blogs,
+tutorials, docs) — similar to how CodePen or GitHub Gist embeds work.
+
+### 4.1 Standalone embed build
+- [x] Create a separate Vite entry point `src/embed.tsx` that renders a
+  minimal, self-contained ontology viewer:
+  - Cytoscape graph visualization (read-only)
+  - Entity/relationship inspector on click
+  - Tab to toggle between graph view and RDF source view
+  - Accepts ontology data via:
+    - `data-ontology-url` attribute (URL to a `.rdf` or `.json` file)
+    - `data-ontology-inline` attribute (inline JSON, base64-encoded)
+    - `data-catalogue-id` attribute (loads from the published `catalogue.json`)
+- [x] Build as a single JS + CSS bundle: `ontology-embed.js` + `ontology-embed.css`
+- [x] Add Vite build config for the embed target:
+  ```ts
+  // vite.config.embed.ts
+  build: {
+    lib: { entry: 'src/embed.tsx', formats: ['iife'], name: 'OntologyEmbed' },
+    rollupOptions: { output: { assetFileNames: 'ontology-embed.[ext]' } }
+  }
+  ```
+- [x] Keep bundle size under 150KB gzipped (Cytoscape is ~90KB gz, must
+  account for it)
+
+### 4.2 Embed API & usage
+- [x] Usage pattern for external pages:
+  ```html
+  <div class="ontology-embed"
+       data-catalogue-id="cosmic-coffee"
+       data-theme="dark"
+       data-height="500px">
+  </div>
+  <script src="https://<site>/ontology-embed.js"></script>
+  ```
+- [x] Support configuration: theme (light/dark), height, initial zoom,
+  read-only mode
+- [x] Provide a "Copy embed code" button in the main app's gallery for each
+  ontology
+
+### 4.3 RDF source tab
+- [x] In the embed widget, add a tabbed view: "Graph" | "RDF Source"
+- [ ] RDF source tab shows syntax-highlighted RDF/XML (use a lightweight
+  highlighter or simple regex-based coloring — no heavy deps)
+- [x] Add a "Copy RDF" button
+
+### 4.4 Interactive samples page
+- [x] Create `public/embed/samples.html` — an article-style page that
+  teaches ontology concepts using live embedded visualizations
+- [x] Cover all 6 official ontologies across 8 sections
+- [x] Include dark/light theme comparison (side-by-side Finance embeds)
+- [x] Embed usage instructions + copy-paste snippet at the end
+
+---
+
+## 5. Complementary features
+
+These enhance the overall experience for a community learning resource.
+
+### 5.1 Deep linking / URL routing
+- [x] Add client-side routing (e.g., lightweight hash-based router)
+- [x] Support routes:
+  - `/#/` — home (current default ontology)
+  - `/#/catalogue` — opens gallery
+  - `/#/catalogue/<ontology-id>` — loads and displays a specific ontology
+  - `/#/embed/<ontology-id>` — full-page embed view (useful for iframes)
+- [x] Shareable URLs: loading the app with a route pre-selects the ontology
+- [ ] Persist catalogue category filter in URL: when user selects a category
+  filter in the gallery, the selection should be saved in the URL query
+  params (e.g., `/#/catalogue?category=healthcare`) so that navigating
+  away and back (or sharing a link) preserves the filter state
+
+### 5.2 Ontology diffing
+- [ ] When loading a new ontology, optionally show a diff view:
+  "You'll add 3 entities, remove 1 relationship..."
+- [ ] Useful for reviewing community PRs or comparing versions
+
+### 5.3 Accessibility & responsive design
+- [x] WCAG 2.1 AA color contrast: audited all four themes, fixed failing text and
+      graph tokens, added `--on-accent` / `--graph-edge-label-bg`, and wired an
+      automated contrast gate (`npm run test:a11y`) into CI
+- [ ] Audit and fix keyboard navigation across all modals and panels
+- [ ] Add ARIA labels to the graph visualization
+- [ ] Ensure the app is usable on tablet-sized screens (responsive breakpoints)
+- [ ] Test with screen readers (VoiceOver, NVDA)
+
+### 5.4 Offline support (PWA)
+- [ ] Add a service worker + web app manifest
+- [ ] Cache `catalogue.json` and the main app shell for offline use
+- [ ] Users can browse the full catalogue without a network connection
+
+## 5.7 Release artifact optimization (post-freeze)
+- [ ] Once feature/code churn stops, run a dedicated optimization pass for release artifacts:
+  - profile bundle composition with `rollup-plugin-visualizer`
+  - split/trim graph-heavy paths and embed runtime where possible
+  - tighten long-term caching strategy and asset naming
+  - re-baseline size targets for main app and embed bundle
+
+### 5.5 Analytics & feedback (privacy-respecting)
+- [ ] Add optional, privacy-respecting analytics (e.g., Plausible, or simple
+  custom event tracking to a static endpoint)
+- [ ] "Was this ontology helpful?" thumbs up/down on each catalogue entry
+- [ ] Track which ontologies are most loaded to surface popular ones
+
+### 5.6 Documentation site / learning content
+- [x] Add a `/learn` section with markdown-rendered educational content:
+  - "What is an ontology?"
+  - "Understanding RDF and OWL"
+  - "Microsoft Fabric IQ Ontology concepts"
+  - "Building your first ontology"
+- [x] Content stored as `.md` files in `content/learn/`, compiled at build time
+- [x] Each tutorial can embed an interactive ontology widget (from §4)
+- [x] Restructured into course-based catalogue with learning paths and hands-on
+  labs (8 courses, 39 articles total)
+- [x] Interactive quizzes with instant correct/wrong feedback
+- [x] Presentation mode (slides split at `##` headings)
+- [x] Progressive ontology catalogue entries for step-by-step learning (18
+  school entries + 6 IQ Lab entries)
+
+---
+
+## 6. Ontology editor / designer
+
+A visual designer for creating ontologies from scratch or editing existing ones.
+The output is a valid RDF file that can be submitted to the catalogue via a
+one-click PR flow.
+
+### 6.1 Visual entity designer
+- [x] Create `OntologyDesigner` component — a full-screen editor panel
+- [x] Entity creation: name, icon picker, color picker, description
+- [x] Property builder: add/remove/reorder properties with type selectors
+  (string, integer, decimal, date, datetime, boolean, enum)
+- [x] Mark identifier properties
+- [x] Drag-and-drop reordering of entities and properties
+
+### 6.2 Relationship builder
+- [x] Visual relationship creation: select source entity → target entity
+- [x] Set relationship name, cardinality (1:1, 1:n, n:1, n:n), description
+- [x] Optional: relationship attributes (e.g., quantity on an order→product
+  edge)
+- [x] Live preview: as relationships are added, the Cytoscape graph updates
+  in real-time
+
+### 6.3 Live graph preview
+- [x] Split-pane layout: editor form on the left, live Cytoscape graph on
+  the right
+- [x] Graph updates in real-time as entities and relationships are
+  added/edited/removed
+- [x] Click a node or edge in the graph to select it in the editor
+
+### 6.4 RDF output & validation
+- [x] "Export RDF" button generates valid RDF/OWL via the serializer from §1
+- [x] "Preview RDF" tab shows the live RDF output as you design
+- [x] Validate the ontology before export:
+  - All relationships reference existing entity IDs
+  - No duplicate entity/relationship IDs
+  - At least one entity type exists
+  - Each entity has at least one identifier property
+
+### 6.5 One-click PR to catalogue
+- [x] "Submit to Catalogue" button that:
+  1. Serializes the ontology to RDF
+  2. Prompts for metadata (name, description, tags, author GitHub username)
+  3. Uses the GitHub API to:
+     a. Fork the repo (if not already forked) into the user's account
+     b. Create a branch `catalogue/<username>/<ontology-slug>`
+     c. Commit the `.rdf` file + `metadata.json` to
+        `catalogue/community/<username>/`
+     d. Open a PR against the upstream repo
+  4. Show a link to the created PR
+- [x] Requires GitHub OAuth — add a "Sign in with GitHub" flow (client-side
+  OAuth via GitHub's device flow or a lightweight OAuth proxy)
+- [x] For unauthenticated users, fall back to "Download RDF" + manual PR
+  instructions
+- [x] Pre-fill the PR description with an ontology summary (entity count,
+  relationship count, description)
+
+### 6.6 Edit existing ontologies
+- [x] "Edit" button in the Gallery for any loaded ontology → opens the
+  designer pre-populated with the ontology data
+- [ ] "Edit" button in the embed widget for catalogue ontologies
+- [x] When editing a community ontology, the PR targets the original file
+  path (update, not create)
+
+### 6.7 Undo / Redo in the designer
+- [x] Add an undo/redo history stack to the designer store (track snapshots
+  of the ontology state on each mutation)
+- [x] Wire Ctrl+Z / Cmd+Z (undo) and Ctrl+Shift+Z / Cmd+Shift+Z (redo)
+  keyboard shortcuts
+- [x] Add undo/redo buttons in the designer toolbar
+- [x] Cap history depth (e.g., 50 steps) to limit memory usage
+
+### 6.8 RDF syntax highlighting
+- [x] Add syntax highlighting to the RDF source view in the designer's
+  "Preview RDF" tab — color XML tags, attributes, namespaces, and values
+- [x] Use a lightweight regex-based highlighter (no heavy deps like
+  Prism/highlight.js) to keep bundle size small
+- [x] Apply the same highlighting to the embed widget's RDF Source tab
+  and the Gallery's "View RDF source" panel
+
+### 6.9 Download RDF from designer
+- [x] Add a "Download .rdf" button to the designer toolbar that saves the
+  current ontology as an RDF/XML file (similar to the catalogue's
+  existing RDF download)
+- [x] File name should be derived from the ontology name (slugified),
+  e.g., `my-ontology.rdf`
+- [x] Validate before download — show validation errors if the ontology
+  has issues, but allow download anyway with a warning
+
+---
+
+## Priority order (suggested)
+
+| Phase | Items | Rationale |
+|-------|-------|-----------|
+| **Phase 1** | §1 (RDF), §2 (Static), §3.1–3.2 (Catalogue structure + build) | Foundation: proper serialization, static deploy, catalogue pipeline |
+| **Phase 2** | §3.3–3.4 (Community workflow + UI), §5.1 (Deep linking), §6.1–6.4 (Editor/designer) | Community: accept contributions, browse catalogue, share links, design ontologies |
+| **Phase 3** | §6.5–6.6 (One-click PR), §4 (Embed widget), §5.6 (Learning content) | Growth: frictionless contribution, embeds drive adoption, docs help newcomers |
+| **Phase 4** | §8 (Command palette), §9 (Templates), §10 (Onboarding) | UX: power-user shortcuts, lower barriers, guided first run |
+| **Phase 5** | §5.2–5.5 (Diff, A11y, PWA, Analytics), §6.8–6.9 | Polish: diffing, accessibility, offline, syntax highlighting |
+
+---
+
+## 7. Responsive design & mobile-friendly layout
+
+The app must be usable on phones and tablets. Shared links (Teams, Slack,
+social media) often land on mobile — if users can't interact, adoption stalls.
+
+### 7.1 Responsive header
+- [x] Collapse icon buttons into a hamburger/overflow menu on small screens
+- [x] Stack logo + subtitle vertically on narrow viewports
+- [x] Hide gamification stats on mobile (or move to hamburger menu)
+
+### 7.2 Responsive main layout
+- [x] Switch from the 3-column grid (inspector | graph | quest) to a
+  single-column stacked layout below 768px
+- [x] Graph takes full width; inspector and quest panel become collapsible
+  drawers or tabs below the graph
+- [x] Touch-friendly: larger tap targets, swipe to dismiss drawers
+
+### 7.3 Responsive modals
+- [x] Modals become full-screen sheets on mobile (no floating card)
+- [x] Scrollable content within the sheet
+- [x] Close button always visible at top
+
+### 7.4 Responsive learn page
+- [x] Article cards stack single-column on narrow screens
+- [x] Article content uses fluid typography and responsive images
+- [x] Navigation buttons (prev/next) are full-width on mobile
+
+### 7.5 Responsive catalogue / gallery
+- [x] Gallery grid adapts: 1 column on phone, 2 on tablet, 3+ on desktop
+- [x] Filter bar wraps or collapses on narrow screens
+- [x] Search bar is full-width on mobile
+
+### 7.6 Responsive designer
+- [x] Stacked layout: entity/relationship form on top, graph preview below
+- [x] Toolbar wraps or uses overflow on narrow screens
+
+---
+
+## 8. Command palette / keyboard shortcuts
+
+- [x] `Cmd+K` / `Ctrl+K` opens a command palette
+- [x] Type to navigate: ontologies, designer, learn, import/export
+- [x] Keyboard shortcuts for common actions (listed in Help modal)
+
+---
+
+## 9. Starter templates in designer
+
+- [x] "Start from template" option when opening the designer empty
+- [x] Domain presets: Retail, Healthcare, Finance, IoT, Education
+- [x] Each template creates 2–3 entities with relationships pre-wired
+- [x] Lowers the "blank page" barrier
+
+---
+
+## 10. Interactive onboarding tour
+
+- [x] Replace the static welcome modal with a 5-step guided tour
+- [x] Spotlight overlay highlights: header → graph → inspector → query bar
+  → designer
+- [x] Dismissable, with "Don't show again" option
+- [x] First-time users get oriented in 30 seconds
+
+---
+
+## 11. Data source connection（已改为「无内置数据集」形态）
+
+- [x] **移除全部内置数据集**：删除 `src/data/dataSources.ts`（预设案例集）与
+  `public/sample-data/fourth-coffee/` 样本数据；产品不再带任何示例数据源
+- [x] Store：`endpoints` 初始为空，`buildDefaultEndpoints()` 恒返回 `[]`，
+  移除 `addPreset` / `presetId` / `isDefault`
+- [x] 接入面板只保留两种方式：**自动解析**（上传 JSON）与**手动填写**
+  （JSON 文件为默认且首选类型，其后依次 REST / SPARQL / GraphQL）
+- [x] 「清空全部」按钮：断开并移除全部数据源，回到空白初始状态
+- [x] Instance Browser shows the mapped entity and translates source columns to
+  ontology property names
+- [x] Tests: `appStore.endpoints.test.ts`（空初始 / 增删 / 清空）、
+  `EndpointConnector.test.tsx`（面板结构、手动表单默认 JSON 类型、自动解析流程）
+- [x] Docs: `docs/default-data-sources.md`（重写为数据源接入指南）
+
+### 11.1 Auto-parse & connect a local JSON file (自动解析接入)
+
+- [x] `src/lib/jsonAutoImport.ts` — 纯函数解析层：行提取 → 列收集 → 实体识别 →
+  列映射自动生成，UI 只负责取文本与渲染
+- [x] Upload / drag-and-drop a `.json` file in「自定义接入 → 自动解析接入」
+- [x] Auto-detect the ontology entity from column headers (scored, with a minimum
+  threshold so unrelated headers are **not** guessed) and auto-build
+  `columnMappings` (greedy one-property-per-column assignment)
+- [x] Preview before connecting: file name, row / column count, `source → property`
+  mapping chips, warnings; switching the entity live-recomputes the mappings
+- [x] Tolerant input: object arrays, `items` / `rows` / `results` / `data` wrappers,
+  GraphQL `data`, SPARQL `results.bindings`, single object, BOM
+- [x] Actionable Chinese errors for CSV / JSON Lines / empty files instead of
+  silently importing nothing
+- [x] Caps: 8 MB per file, 5000 rows kept (truncation is reported in the preview)
+- [x] `DataEndpoint.localRows` / `localFileName`; `fetchEndpointRows` returns the
+  in-memory rows without any network call, so local sources work offline and
+  bypass CORS
+- [x] Tests: `src/lib/jsonAutoImport.test.ts` (25), `datasetFetcher.test.ts` (local
+  source path), `EndpointConnector.test.tsx` (upload → preview → connect flow)
+
+### 11.1 Multi-entity bucketed graph JSON (`{ objects, relationships }`)
+
+- [x] `bucketContainerOf()` detects `objects` / `entities` / `instances` / `nodes`
+  containers holding `{ entityName: [rows] }`; a plain `{ data: { orders: [...] } }`
+  REST / GraphQL payload is deliberately **not** treated as a bucketed graph
+- [x] Each bucket becomes its own `GraphBucket` (rows / columns / truncation) and
+  is connected as a **separate** data source named `文件名 · 桶名`
+- [x] `matchEntityByBucketName()` matches bucket names against ontology entity
+  names (`Test_Case` ≡ `TestCase`, `Requirement_Document` → `Requirement`),
+  exact matches winning over containment; `assignBucketEntities()` greedily
+  guarantees one entity per bucket
+- [x] A bucket whose name clearly looks like an entity name but does not exist in
+  the ontology is **left unmapped** instead of falling back to column guessing
+  (which used to map `Test_Case` onto an unrelated `Order`); generic container
+  names (`rows`, `data`, …) still allow column-based guessing
+- [x] `relationships` / `relations` / `edges` / `links` are extracted and can be
+  connected as an extra relation data source (`文件名 · relationships`)
+- [x] Preview UI in `EndpointConnector.tsx`: per-bucket checkboxes (row / column
+  count + matched entity), select-all toggle, relation toggle, name-prefix input,
+  live「N 个桶已匹配」summary, and an explicit warning when nothing matched
+- [x] Re-uploading the same file **refreshes** the existing data sources in place
+  instead of stacking duplicates
+- [x] Entity chips in the connected-endpoints list now resolve against
+  `currentOntology` instead of the hard-coded Fourth Coffee ontology
+- [x] Tests: `src/lib/jsonAutoImport.test.ts` (40),
+  `src/components/EndpointConnector.test.tsx` (17)
+
+---
+
+## 12. LLM-grounded retrieval Q&A (智能检索问答)
+
+- [x] Provider presets in `src/data/llmProviders.ts` — OpenAI GPT, DeepSeek,
+  Zhipu GLM, DashScope Qwen, Kimi, SiliconFlow, local Ollama, custom
+  OpenAI-compatible gateway (all via the OpenAI-compatible `/chat/completions`)
+- [x] `LlmConfig` persisted to `localStorage` (`ontology-platform.llm-config`)
+  with `setLlmConfig` / `resetLmConfig` actions in the app store
+- [x] LLM client (`src/lib/llmClient.ts`): ontology + dataset grounding context,
+  message assembly, streaming SSE and non-streaming calls, error classification
+  (auth / not-found / rate-limit / server / cors / timeout / empty)
+- [x] Shared dataset fetcher (`src/lib/datasetFetcher.ts`) reused by both the
+  Instance Browser and the Q&A console
+- [x] Model connection modal (`src/components/LlmConnector.tsx`) with provider
+  grid, endpoint, API key (masked), model quick-chips, temperature / max tokens,
+  live connection test, proxy prefix for private gateways
+- [x] Top-right model-connection icon with status dot (custom SVG chip icon)
+- [x] Answer console below the graph (`src/components/AIQueryConsole.tsx`):
+  local graph hits + real dataset rows → streamed LLM answer, with a citations
+  block (engine, latency, context size, ontology, datasets, graph hits) and
+  clickable hit chips
+- [x] Graceful degradation: no model → local query engine answer + upgrade hint;
+  LLM failure → error hint plus local answer so there is always output
+- [x] Layout: left column split into graph + console; `QueryPlayground`
+  superseded; footer moved under the console
+- [x] Tests: `src/data/llmProviders.test.ts` (22),
+  `src/lib/llmClient.test.ts` (24), `src/lib/datasetFetcher.test.ts` (17)
+- [x] Docs: `docs/llm-integration.md` (providers, workflow, CORS findings,
+  security, troubleshooting, cost tips)
+- [x] **本地 CORS 代理**（2026-09-18）：实测自建网关（One-API / new-api / 自研反代）
+  通常不放行 CORS —— `OPTIONS` 预检被 403 拒绝，浏览器抛 `TypeError: Failed to fetch`，
+  且该失败发生在响应到达 JS 之前，前端既拿不到状态码也无法绕过（`curl` 正常不代表浏览器正常）。
+  新增零依赖代理 `scripts/llm-proxy.mjs`（`npm run llm:proxy`）：补 OPTIONS 204 与
+  `Access-Control-*`、回显 `Access-Control-Request-Headers`、SSE 逐段直通
+  （`accept-encoding: identity` + 关闭缓冲）、丢弃上游自带的 CORS 头避免重复值、
+  剥离 `origin`/`referer` 绕开防盗链、`/__health` 健康检查；只绑定 `127.0.0.1`，不存 Key。
+  「模型连接 → 高级」新增「填入本地代理」「检测代理」与混合内容（https 页面 + http 代理）警告；
+  错误提示按「是否已配代理」分流，不再一律把用户引向「去填代理」。
+  测试：`scripts/llm-proxy.test.ts`（17，含端到端预检/转发/SSE 与「文案里的 npm 脚本名必须真实存在」锁）；
+  `src/components/LlmConnector.test.tsx`（8）。复验脚本 `verify-llm-proxy.mjs`。
+- [x] **代理配了仍连不上：从「报错」修到「不再发生」**（2026-09-18）：
+  用户配了代理前缀仍报 `Failed to fetch`。排查发现代理脚本本身完好（预检 204 / 健康检查 200 /
+  真实网关转发 401 均正常），问题在客户端侧三处：
+  ① **代理前缀漏写协议会静默失败** —— `127.0.0.1:8787` 拼出的是非法绝对地址，
+  `localhost:8787` 会被 URL 解析器当成 scheme 为 `localhost:` 的地址，两者都只抛
+  `Failed to fetch`，报错完全不指向原因 → `normalizeProxyBase` 统一补 `http://`，`withProxy`
+  同一份逻辑（不再两处各写一份），新增 `proxyPrefixIssue` 校验协议与「误带路径」并在输入框下方当场提示；
+  ② **失败提示没有信息量** —— 原提示只让用户「自己去点检测代理」。新增 `diagnoseProxyFailure`：
+  先查写法（不碰网络），再敲一次 `/__health`，直接给出「代理没启动」或「代理正常，问题在接口地址/模型名/Key」的确定结论；
+  同一次探测结果同时喂给「检测代理」面板，避免两处结论打架。已接入 `AIQueryConsole` 与 `LlmConnector`；
+  ③ **根因是「代理没启动」** → `vite.config.ts` 新增 `llmCorsProxyPlugin`（`apply: 'serve'`），
+  `npm run dev` 顺手把代理起起来，dev server 关闭时回收子进程；端口被占用按「已有代理在跑」友好退出（退出码 0）。
+  顺带修掉一处**展示 bug**：弹窗里「实际请求地址」是裸拼接，少了中间那个 `/`，
+  显示的地址与真正请求的地址不是一回事（排障时反被带偏），改为复用 `withProxy`。
+  测试：`llmProviders`（+10，归一化与校验）、`llmClient`（+5，自动诊断，含前缀漏写协议仍可诊断）、
+  新建 `src/components/AIQueryConsole.test.tsx`（4，按 URL 分流的 fetch 替身精确复现浏览器表现）、
+  `LlmConnector.test.tsx`（+3）。全量 37 文件 / 720 测试绿。
+
+---
+
+## Low-priority / deferred
+
+- [x] **存入本体库**（2026-09-18）：导入 RDF 成功后在「导入 / 导出本体」弹窗内
+  提供「存入本体库」按钮，把当前导入的本体写入 localStorage 本体库（`source: 'local'`，
+  作者「我」）；本体库弹窗合并展示「我的」条目（排最前、可筛选、可删除、同名覆盖），
+  本地条目加载后直接关闭弹窗（无深链）。
+- [x] **数据源存入本体库**（2026-09-18）：「接入数据源」面板顶部新增
+  **「存入本体库」**，把当前本体与已接入的全部数据源一起存成同一条目；
+  `saveUserOntology(ontology, bindings, endpoints?)` —— 不传 endpoints 表示
+  「不动已存的数据源」（导入路径用），传数组表示整体替换（数据源面板用）。
+  本地 JSON 文件的行数据不入库（剥离 + `needsFileReupload` 标记，加载后提示重新上传），
+  运行时抓取状态同样剥离；本体库卡片显示「N 个数据源」，加载时一并恢复。
+- [x] **移除「推送到 Microsoft Fabric」按钮**：`ImportExportModal` 不再提供
+  Fabric 入口（`FabricExportModal` 组件与 `src/lib/fabric.ts` 保留但未挂载）。
+- [ ] **"Use in Fabric IQ" export wizard** — A guided flow (validate →
+  download RDF → show Fabric IQ upload instructions). Deferred until the
+  Fabric IQ integration story is clearer and a native link/API may be
+  available.
+- [x] **Re-enable GitHub Pages workflow** — enabled with repo-scoped behavior:
+  push-triggered Pages deploy runs for `microsoft/Ontology-Playground`.

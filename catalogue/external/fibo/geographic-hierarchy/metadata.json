@@ -1,6 +1,6 @@
 {
   "name": "FIBO Geographic Hierarchy",
-  "description": "Regions, countries, and jurisdictions with disaster-zone flags for hurricane, flood, earthquake, and wildfire risk — adapted from EDM Council FIBO geographic modules.",
+  "description": "区域、国家与司法辖区，带飓风、洪水、地震与野火风险的灾害区标记 —— 改编自 EDM 委员会 FIBO 地理模块。",
   "icon": "🌍",
   "category": "fibo",
   "tags": [

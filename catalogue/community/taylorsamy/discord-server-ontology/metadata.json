@@ -1,8 +1,13 @@
 {
   "name": "Discord Server Ontology",
-  "description": "An ontology representing the Fabric Community Discord server, including members, roles, channels, messages, events, and moderation actions.",
+  "description": "描述 Fabric 社区 Discord 服务器的本体，涵盖成员、角色、频道、消息、活动与审核处置。",
   "icon": "💬",
   "category": "general",
-  "tags": ["learning", "contest", "discord", "community"],
+  "tags": [
+    "learning",
+    "contest",
+    "discord",
+    "community"
+  ],
   "author": "taylorsamy"
 }

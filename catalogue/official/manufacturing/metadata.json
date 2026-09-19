@@ -1,6 +1,6 @@
 {
   "name": "Smart Manufacturing",
-  "description": "Production with machines, sensors, work orders, and quality checks",
+  "description": "生产制造，涵盖设备、传感器、工单与质检。",
   "icon": "🏭",
   "category": "manufacturing",
   "author": "ontology-quest"

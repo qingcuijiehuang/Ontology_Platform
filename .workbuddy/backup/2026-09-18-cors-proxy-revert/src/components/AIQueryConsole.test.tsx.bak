@@ -1,0 +1,122 @@
+/**
+ * 智能检索问答 —— 网络失败时的自动诊断
+ * ---------------------------------------------------------------------------
+ * 背景：用户配了本地代理仍连不上自建网关，界面只回一句
+ * 「网络请求失败（可能被跨域策略拦截或目标不可达）」。
+ * 这句话同时对应四种完全不同的成因（代理没起 / 前缀写错 / Key 不对 / 网关路径不对），
+ * 修法各不相同。这里锁住：失败时由代码自动探测并给出**确定结论**。
+ *
+ * 浏览器对 CORS 与网络不可达都只抛 `TypeError: Failed to fetch`，jsdom 不做 CORS
+ * 检查，所以这里用「按 URL 分流」的 fetch 替身：/__health 走真实本地服务，
+ * 其余请求一律打回失败态 —— 精确复现真实浏览器里的表现。
+ */
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { createServer, type Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
+import { AIQueryConsole } from './AIQueryConsole';
+import { useAppStore } from '../store/appStore';
+import { DEFAULT_LLM_CONFIG } from '../data/llmProviders';
+
+const realFetch = globalThis.fetch;
+
+/** 让模型请求一律失败（等价于浏览器抛 Failed to fetch），但放行代理健康检查。 */
+function stubNetworkWithOnlyProxyAlive() {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : String(input);
+      if (url.includes('/__health')) return realFetch(input as RequestInfo, init);
+      return Promise.reject(new TypeError('Failed to fetch'));
+    }),
+  );
+}
+
+function setLlm(proxyBaseUrl: string) {
+  useAppStore.setState({
+    llm: {
+      ...DEFAULT_LLM_CONFIG,
+      apiKey: 'sk-test',
+      model: 'gpt-5.6-sol',
+      baseUrl: 'https://api.qingcuicore.com/v1',
+      proxyBaseUrl,
+    },
+    endpoints: [],
+  });
+}
+
+async function ask(question: string) {
+  const user = userEvent.setup();
+  const { container } = render(<AIQueryConsole onOpenModelSettings={() => {}} />);
+  await user.type(screen.getByLabelText('检索问题'), question);
+  // 面板折叠按钮的可访问名里也含「检索」（标题为「智能检索问答」），
+  // 按 role+name 查会命中两个，所以这里直接取发送按钮本体。
+  const send = container.querySelector<HTMLButtonElement>('.ai-send-btn');
+  if (!send) throw new Error('未找到发送按钮 .ai-send-btn');
+  await user.click(send);
+}
+
+describe('AIQueryConsole · 网络失败自动诊断', () => {
+  let server: Server;
+  let port = 0;
+
+  beforeEach(async () => {
+    window.localStorage.clear();
+    server = createServer((req, res) => {
+      if (req.url?.includes('/__health')) {
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, service: 'llm-cors-proxy' }));
+        return;
+      }
+      res.writeHead(404);
+      res.end();
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', () => resolve()));
+    port = (server.address() as AddressInfo).port;
+    stubNetworkWithOnlyProxyAlive();
+  });
+
+  afterEach(async () => {
+    vi.unstubAllGlobals();
+    await new Promise<void>((resolve) => {
+      server.closeAllConnections();
+      server.close(() => resolve());
+    });
+  });
+
+  it('代理正常但仍失败 → 提示「问题不在代理」，把用户从代理这条线上引开', async () => {
+    setLlm(`http://127.0.0.1:${port}`);
+    await ask('金牌会员的订单总额是多少？');
+
+    expect(await screen.findByText(/已自动检测：本地代理正常/)).toBeTruthy();
+    expect(screen.getByText(/问题不在代理/)).toBeTruthy();
+    // 不能还停留在答非所问的「请填写代理前缀」上
+    expect(screen.queryByText(/请填写自建代理前缀/)).toBeNull();
+  });
+
+  it('代理没启动 → 结论直指代理，并给出可执行的启动命令', async () => {
+    // 端口 1 必然无人监听，等价于「填了代理但忘了启动」
+    setLlm('http://127.0.0.1:1');
+    await ask('金牌会员的订单总额是多少？');
+
+    expect(await screen.findByText(/已自动检测：无法连接/)).toBeTruthy();
+    expect(screen.getByText(/npm run llm:proxy/)).toBeTruthy();
+  });
+
+  it('代理前缀漏写 http:// → 归一化后仍能正常诊断（不再静默失败）', async () => {
+    setLlm(`127.0.0.1:${port}`);
+    await ask('金牌会员的订单总额是多少？');
+
+    // 过去这种写法会拼出非法 URL，报错含糊；现在照样能判定代理是活的
+    expect(await screen.findByText(/已自动检测：本地代理正常/)).toBeTruthy();
+  });
+
+  it('未配代理时不做代理诊断，仍走「浏览器端无法绕过」的引导', async () => {
+    setLlm('');
+    await ask('金牌会员的订单总额是多少？');
+
+    expect(await screen.findByText(/无法绕过/)).toBeTruthy();
+    expect(screen.queryByText(/已自动检测/)).toBeNull();
+  });
+});

@@ -1,8 +1,13 @@
 {
   "name": "Cruise Company",
-  "description": "Cruise line operations and guest experience ontology covering ships, sailings, bookings, cabins, ports, excursions, crew, and loyalty tiers.",
+  "description": "邮轮公司运营与宾客体验本体，涵盖邮轮、航次、预订、舱房、港口、岸上游览、船员与会员等级。",
   "icon": "🚢",
   "category": "general",
-  "tags": ["cruise", "travel", "operations", "hospitality"],
+  "tags": [
+    "cruise",
+    "travel",
+    "operations",
+    "hospitality"
+  ],
   "author": "a-villarruel"
 }

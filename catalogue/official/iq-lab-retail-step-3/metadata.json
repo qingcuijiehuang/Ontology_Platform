@@ -1,6 +1,6 @@
 {
   "name": "Retail Supply Chain — Step 3: Geography",
-  "description": "Region and Store model where orders are fulfilled",
+  "description": "区域与门店模型，订单在此完成履约。",
   "icon": "🌐",
   "category": "school",
   "tags": [

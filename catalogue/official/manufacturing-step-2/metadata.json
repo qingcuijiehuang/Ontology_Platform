@@ -1,8 +1,13 @@
 {
   "name": "Manufacturing — Step 2: Work Orders & Parts",
-  "description": "Work-Order and Part for production tracking",
+  "description": "工单与零件，用于生产跟踪。",
   "icon": "📋",
   "category": "school",
-  "tags": ["manufacturing", "iot", "school", "step-2"],
+  "tags": [
+    "manufacturing",
+    "iot",
+    "school",
+    "step-2"
+  ],
   "author": "ontology-quest"
 }

@@ -1,6 +1,6 @@
 {
   "name": "FIBO Loans General (Adapted Subset)",
-  "description": "A curated, classroom-friendly subset adapted from the EDM Council FIBO LOAN/LoansGeneral/Loans module — covering loan, collateral, servicing, and payment semantics.",
+  "description": "精选的、适合课堂使用的子集，改编自 EDM 委员会 FIBO LOAN／LoansGeneral／Loans 模块 —— 涵盖贷款、抵押品、贷后服务与还款语义。",
   "icon": "🏛️",
   "category": "fibo",
   "tags": [

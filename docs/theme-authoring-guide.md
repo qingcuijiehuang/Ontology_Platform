@@ -34,14 +34,17 @@ Two helpers tie it together:
 ### Where the theme class is applied
 
 `themeClass(theme)` is attached to the root element of each top-level surface —
-**not** to `<body>`:
+**and**, before the first paint, to `<html>` itself:
 
 - [`src/App.tsx`](../src/App.tsx) → `app-container ${themeClass(theme)}`
 - [`src/components/OntologyDesigner.tsx`](../src/components/OntologyDesigner.tsx) → `designer-page ${themeClass(theme)}`
 - [`src/components/LearnPage.tsx`](../src/components/LearnPage.tsx) → `learn-page ${themeClass(theme)}`
+- [`index.html`](../index.html) → a small inline script mirrors `themeClass()`
+  onto `<html>` from `localStorage` before the bundle loads, so a light-mode
+  user never sees a dark flash and `<body>` picks up the light surface as well.
 
-`:root` (and therefore `<body>`) always carries the **Dark** defaults. See
-[Gotcha 1](#gotcha-1-the-body-stays-dark) for why that matters.
+`:root` carries the **Dark** defaults, but the theme used when nothing is stored
+is **light** — see `getInitialTheme()` in `appStore.ts`.
 
 ### How `themeClass` layers classes
 
@@ -83,7 +86,7 @@ over it).
 | Borders | `--border-color`, `--border-subtle` | Panel/control borders. |
 | Shadow | `--shadow-glow` | Accent glow; tint it to match the accent. |
 | Graph | `--graph-bg`, `--graph-node-text`, `--graph-edge-color`, `--graph-edge-text`, `--graph-edge-label-bg` | Read at runtime by the graph + designer preview. `--graph-edge-label-bg` is the **opaque** chip behind edge labels; edge text must clear 4.5:1 against it. **Tune all of these for contrast** — see [Accessibility](#accessibility-wcag-21-aa-contrast). |
-| Canvas checker | `--chess-square-dark`, `--chess-square-light` | The graph canvas backdrop pattern. `--chess-square-light` is the **solid base** — see [Gotcha 1](#gotcha-1-the-body-stays-dark). |
+| Canvas checker | `--chess-square-dark`, `--chess-square-light` | Legacy checkerboard pattern tokens. The graph canvas now paints a **plain solid** `--graph-bg` (no pattern), so nothing currently reads these — kept for surfaces that want a patterned backdrop. |
 | About links | `--about-link-color`, `--about-link-hover-color` | Links on the About screen. |
 
 > The accent tokens are historically named `--ms-*`. Treat them as generic accent
@@ -106,10 +109,10 @@ export type ThemeId = 'dark' | 'light' | 'aurora' | 'crimson' | 'indigo';
 
 ```ts
 export const THEME_OPTIONS: { id: ThemeId; label: string; swatch: string }[] = [
-  { id: 'dark',    label: 'Dark',    swatch: '#1B1B1B' },
-  { id: 'light',   label: 'Light',   swatch: '#F5F5F5' },
-  { id: 'aurora',  label: 'Aurora',  swatch: '#2AAA92' },
-  { id: 'crimson', label: 'Crimson', swatch: '#D6002A' },
+  { id: 'light',   label: '浅色',    swatch: '#F5F5F5' }, // default — listed first
+  { id: 'dark',    label: '深色',    swatch: '#1B1B1B' },
+  { id: 'aurora',  label: '极光',    swatch: '#2AAA92' },
+  { id: 'crimson', label: '绯红',    swatch: '#D6002A' },
   { id: 'indigo',  label: 'Indigo',  swatch: '#4F46E5' }, // swatch = the dot in the picker
 ];
 ```
@@ -177,15 +180,15 @@ light) and retune. Place it after the existing theme blocks.
   --graph-edge-text: #9AA0D6;
   --graph-edge-label-bg: #181A2E;   /* opaque chip behind edge labels */
 
-  --chess-square-dark: rgba(40, 44, 90, 0.85);
-  --chess-square-light: rgba(30, 33, 70, 0.65);
   --about-link-color: #A5B4FC;
   --about-link-hover-color: #C7D2FE;
 }
 ```
 
-For a **light-based** theme, override `.theme-<id>` to layer over `.light-theme`,
-and make `--chess-square-light` an **opaque** light color (see Gotcha 1).
+For a **light-based** theme, override `.theme-<id>` to layer over `.light-theme`.
+Either way, the new id must also be registered in `themeClass()` **and** in the
+first-paint script in `index.html` — see
+[Gotcha 1](#gotcha-1-the-body-must-not-stay-dark-under-a-light-theme).
 
 ### 6. Verify
 
@@ -198,40 +201,23 @@ That's it — the graph, designer preview, and learn pages pick up the new
 
 ## Gotchas
 
-### Gotcha 1: the `<body>` stays dark
+### Gotcha 1: the `<body>` must not stay dark under a light theme
 
-The theme class is applied to `.app-container` / `.designer-page` /
-`.learn-page`, **not** `<body>`. `<body>` keeps the `:root` (Dark) background
-(`#1B1B1B`). Any element with a **transparent or semi-transparent background**
-lets that dark body show through.
+`themeClass()` lands on `.app-container` / `.designer-page` / `.learn-page`
+**and** on `<html>` — the latter via the inline script in `index.html`, which
+runs before first paint. That script is what keeps `<body>`
+(`background: var(--bg-primary)`) from rendering `:root`'s dark `#1B1B1B` while
+a light theme is active, and it also removes the dark flash on load.
 
-This bites the **graph canvas**. Its backdrop is the chess pattern in
-`.graph-container`, whose solid base is `--chess-square-light`:
+Two rules follow:
 
-```css
-.graph-container {
-  background-image: /* squares painted with var(--chess-square-dark) */;
-  background-color: var(--chess-square-light); /* the solid base */
-}
-```
-
-If `--chess-square-light` is translucent on a light theme, the dark body bleeds
-through and the canvas reads dark — making dark node labels unreadable. (This was
-a real bug in Crimson.)
-
-**Rule:** for a light theme, `--chess-square-light` must be an **opaque** light
-color. Compare:
-
-```css
-/* WRONG — translucent base, dark body shows through */
---chess-square-light: rgba(214, 0, 42, 0.03);
-
-/* RIGHT — opaque light base */
---chess-square-light: #FBF7F8;
-```
-
-Dark-based themes can use translucent values because the body behind them is
-already dark.
+1. **Keep the `index.html` script in sync with `themeClass()`.** A new theme
+   needs its class added there too, otherwise the first paint uses the wrong
+   palette (and, on a light theme, a dark `--bg-primary`).
+2. **Give the graph canvas an opaque color.** `.graph-container` now uses
+   `background: var(--graph-bg)` — a plain solid fill, no pattern — so a
+   translucent `--graph-bg` would still let the body bleed through and make node
+   labels unreadable.
 
 ### Gotcha 2: graph colors come from CSS, not props
 

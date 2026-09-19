@@ -1,0 +1,127 @@
+import { describe, expect, it } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import {
+  FOURTH_COFFEE_DATASOURCES,
+  DEFAULT_ENDPOINT_PRESETS,
+  SAMPLE_PRESETS,
+  CATEGORY_META,
+  groupPresetsByCategory,
+} from './dataSources';
+import { cosmicCoffeeOntology } from './ontology';
+
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+
+const entityById = new Map(cosmicCoffeeOntology.entityTypes.map((e) => [e.id, e]));
+
+/** Resolve a bundled sample-data URL to its on-disk path inside public/. */
+function sampleFileFromUrl(url: string): string {
+  const marker = 'sample-data/';
+  const idx = url.indexOf(marker);
+  const relative = idx >= 0 ? url.slice(idx) : url.replace(/^\/+/, '');
+  return path.join(repoRoot, 'public', relative);
+}
+
+describe('Fourth Coffee default data source case set', () => {
+  it('每个案例 id 唯一', () => {
+    const ids = FOURTH_COFFEE_DATASOURCES.map((p) => p.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('为 Fourth Coffee 的全部 6 个实体都提供了内置样本数据集', () => {
+    expect(SAMPLE_PRESETS.length).toBeGreaterThanOrEqual(cosmicCoffeeOntology.entityTypes.length);
+
+    const covered = new Set(SAMPLE_PRESETS.map((p) => p.entityTypeId));
+    for (const entity of cosmicCoffeeOntology.entityTypes) {
+      expect(covered.has(entity.id)).toBe(true);
+    }
+    // 内置样本均为本地 JSON 数据集，保证开箱即用、离线可访问
+    expect(SAMPLE_PRESETS.every((p) => p.kind === 'json-file')).toBe(true);
+    expect(SAMPLE_PRESETS.every((p) => p.isDefault === true)).toBe(true);
+  });
+
+  it('平台默认不自动接入任何数据源，但内置样本仍作为可选案例保留', () => {
+    expect(DEFAULT_ENDPOINT_PRESETS).toHaveLength(0);
+
+    // 6 个内置样本一个都没被删掉，只是不再默认接入
+    expect(SAMPLE_PRESETS.length).toBeGreaterThan(0);
+    for (const preset of SAMPLE_PRESETS) {
+      expect(FOURTH_COFFEE_DATASOURCES).toContain(preset);
+    }
+  });
+
+  it('每个案例都声明了可解析的地址', () => {
+    for (const preset of FOURTH_COFFEE_DATASOURCES) {
+      if (preset.category === 'sample') {
+        // 站点内相对路径
+        expect(preset.url).toContain('sample-data/fourth-coffee/');
+        expect(preset.url.endsWith('.json')).toBe(true);
+      } else {
+        expect(() => new URL(preset.url)).not.toThrow();
+        expect(preset.url.startsWith('http')).toBe(true);
+      }
+    }
+  });
+
+  it('案例声明的实体类型都存在于 Fourth Coffee 本体', () => {
+    for (const preset of FOURTH_COFFEE_DATASOURCES) {
+      if (!preset.entityTypeId) continue;
+      expect(entityById.has(preset.entityTypeId)).toBe(true);
+    }
+  });
+
+  it('列映射的目标属性都存在于对应实体上', () => {
+    for (const preset of FOURTH_COFFEE_DATASOURCES) {
+      if (!preset.columnMappings) continue;
+      expect(preset.entityTypeId).toBeTruthy();
+      const entity = entityById.get(preset.entityTypeId as string);
+      expect(entity).toBeTruthy();
+      const propNames = new Set(entity!.properties.map((p) => p.name));
+      for (const [sourceColumn, propertyName] of Object.entries(preset.columnMappings)) {
+        expect(sourceColumn.length).toBeGreaterThan(0);
+        expect(propNames.has(propertyName)).toBe(true);
+      }
+    }
+  });
+
+  it('SPARQL / GraphQL 案例都带上了预设查询', () => {
+    for (const preset of FOURTH_COFFEE_DATASOURCES) {
+      if (preset.kind === 'sparql' || preset.kind === 'graphql') {
+        expect(typeof preset.query).toBe('string');
+        expect((preset.query ?? '').trim().length).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('内置样本数据集文件真实存在，且行数与声明一致', () => {
+    for (const preset of SAMPLE_PRESETS) {
+      const file = sampleFileFromUrl(preset.url);
+      expect(fs.existsSync(file), `缺少样本数据文件：${file}`).toBe(true);
+      const parsed = JSON.parse(fs.readFileSync(file, 'utf-8')) as {
+        entityTypeId: string;
+        rows: Record<string, unknown>[];
+      };
+      expect(parsed.rows.length).toBeGreaterThan(0);
+      expect(parsed.entityTypeId).toBe(preset.entityTypeId);
+
+      // 每个声明的源列都应真实出现在数据行中
+      const keys = new Set(Object.keys(parsed.rows[0]));
+      for (const sourceColumn of Object.keys(preset.columnMappings ?? {})) {
+        expect(keys.has(sourceColumn), `${preset.id} 缺少源列 ${sourceColumn}`).toBe(true);
+      }
+    }
+  });
+
+  it('案例按分类分组，组内不为空且顺序为 样本 → REST → SPARQL → GraphQL', () => {
+    const groups = groupPresetsByCategory();
+    const categories = groups.map((g) => g.category);
+
+    expect(new Set(categories).size).toBe(categories.length);
+    expect(groups.every((g) => g.presets.length > 0)).toBe(true);
+    expect(groups.every((g) => g.presets.every((p) => p.category === g.category))).toBe(true);
+
+    const orders = groups.map((g) => CATEGORY_META[g.category].order);
+    expect([...orders].sort((a, b) => a - b)).toEqual(orders);
+  });
+});

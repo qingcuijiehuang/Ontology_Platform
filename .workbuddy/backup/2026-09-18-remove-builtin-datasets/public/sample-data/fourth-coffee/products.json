@@ -1,0 +1,20 @@
+{
+  "dataset": "fourth-coffee.products",
+  "source": "Semantic model",
+  "table": "semantic_model.Products",
+  "entityTypeId": "product",
+  "rowCount": 10,
+  "generatedAt": "2026-09-13",
+  "rows": [
+    { "ProductKey": "PROD-001", "ProductName": "Ethiopian Single Origin", "ProductCategory": "Brewed", "UnitPrice": 4.5, "OriginCountry": "Ethiopia", "IsOrganic": true },
+    { "ProductKey": "PROD-002", "ProductName": "Colombian Latte", "ProductCategory": "Espresso", "UnitPrice": 5.75, "OriginCountry": "Colombia", "IsOrganic": false },
+    { "ProductKey": "PROD-003", "ProductName": "Nebula Cold Brew", "ProductCategory": "Cold Brew", "UnitPrice": 5.25, "OriginCountry": "Guatemala", "IsOrganic": true },
+    { "ProductKey": "PROD-004", "ProductName": "Kenya AA Pour Over", "ProductCategory": "Brewed", "UnitPrice": 5.5, "OriginCountry": "Kenya", "IsOrganic": true },
+    { "ProductKey": "PROD-005", "ProductName": "Sumatra Dark Roast", "ProductCategory": "Espresso", "UnitPrice": 4.95, "OriginCountry": "Indonesia", "IsOrganic": false },
+    { "ProductKey": "PROD-006", "ProductName": "Costa Rica Honey", "ProductCategory": "Brewed", "UnitPrice": 6.25, "OriginCountry": "Costa Rica", "IsOrganic": true },
+    { "ProductKey": "PROD-007", "ProductName": "Jasmine Green Tea", "ProductCategory": "Tea", "UnitPrice": 3.75, "OriginCountry": "China", "IsOrganic": true },
+    { "ProductKey": "PROD-008", "ProductName": "Butter Croissant", "ProductCategory": "Food", "UnitPrice": 3.5, "OriginCountry": "France", "IsOrganic": false },
+    { "ProductKey": "PROD-009", "ProductName": "Cold Brew Growler", "ProductCategory": "Cold Brew", "UnitPrice": 18.0, "OriginCountry": "Guatemala", "IsOrganic": true },
+    { "ProductKey": "PROD-010", "ProductName": "Fourth Coffee Ceramic Mug", "ProductCategory": "Merchandise", "UnitPrice": 14.0, "OriginCountry": "Japan", "IsOrganic": false }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "dataset": "fourth-coffee.suppliers",
+  "source": "Data Lakehouse (bronze)",
+  "table": "lakehouse.bronze.suppliers",
+  "entityTypeId": "supplier",
+  "rowCount": 5,
+  "generatedAt": "2026-09-13",
+  "rows": [
+    { "supplier_id": "SUPP-001", "supplier_name": "Ethiopia Highlands Farm", "country_name": "Ethiopia", "certification_type": "Fair Trade", "quality_rating": 4.8 },
+    { "supplier_id": "SUPP-002", "supplier_name": "Colombian Mountain Roasters", "country_name": "Colombia", "certification_type": "Rainforest Alliance", "quality_rating": 4.6 },
+    { "supplier_id": "SUPP-003", "supplier_name": "Guatemala Antigua Cooperative", "country_name": "Guatemala", "certification_type": "Direct Trade", "quality_rating": 4.7 },
+    { "supplier_id": "SUPP-004", "supplier_name": "Kenya Nyeri Estate", "country_name": "Kenya", "certification_type": "Organic", "quality_rating": 4.9 },
+    { "supplier_id": "SUPP-005", "supplier_name": "Sumatra Mandheling Traders", "country_name": "Indonesia", "certification_type": "None", "quality_rating": 4.2 }
+  ]
+}

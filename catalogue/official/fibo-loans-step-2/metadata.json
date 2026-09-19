@@ -1,9 +1,14 @@
 {
   "name": "FIBO Loans Lab — Step 2: Collateral & Payment Schedule",
-  "description": "Add collateral and payment schedule semantics — adapted from FIBO FBC/DebtAndEquities and LOAN/LoansGeneral.",
+  "description": "加入抵押品与还款计划语义 —— 改编自 FIBO FBC／DebtAndEquities 与 LOAN／LoansGeneral。",
   "icon": "🏠",
   "category": "school",
-  "tags": ["fibo", "loan", "school", "step-2"],
+  "tags": [
+    "fibo",
+    "loan",
+    "school",
+    "step-2"
+  ],
   "author": "EDM Council FIBO (adapted by ontology-quest)",
   "license": "MIT",
   "sourceUrl": "https://github.com/edmcouncil/fibo"

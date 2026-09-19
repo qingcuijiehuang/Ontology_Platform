@@ -1,6 +1,6 @@
 {
   "name": "FIBO Regulatory Context",
-  "description": "Banking regulations (OCC, FDIC, Basel III) and quantitative concentration limits for portfolio risk management — adapted from EDM Council FIBO regulatory modules.",
+  "description": "银行监管规则（OCC、FDIC、巴塞尔协议 III）与用于组合风险管理的量化集中度限额 —— 改编自 EDM 委员会 FIBO 监管模块。",
   "icon": "⚖️",
   "category": "fibo",
   "tags": [

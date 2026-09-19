@@ -1,6 +1,6 @@
 {
   "name": "Sales Analytics That Speaks Business—Using Fabric IQ Ontology",
-  "description": "A Fabric IQ–powered sales ontology that transforms transactional sales data into meaningful business relationships, enabling users to explore concepts like Customers, Orders, Invoices, Returns, Revenue, Products, and Sales Performance using natural business language instead of SQL queries.",
+  "description": "由 Fabric IQ 驱动的销售本体，把交易型销售数据转化为有业务含义的实体关系，让用户可以用自然业务语言（而非 SQL 查询）探索客户、订单、发票、退货、营收、产品与销售业绩等概念。",
   "icon": "🛒",
   "category": "retail",
   "tags": [

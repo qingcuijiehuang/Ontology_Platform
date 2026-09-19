@@ -30,7 +30,7 @@ export function OntologyStatsPanel() {
       >
         <span className="stats-panel-title">
           <BarChart2 size={14} />
-          Ontology Insights
+          本体概览
         </span>
         {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
       </button>
@@ -42,17 +42,17 @@ export function OntologyStatsPanel() {
             <div className="stat-card stat-card--blue">
               <Layers size={16} className="stat-card-icon" />
               <div className="stat-card-value">{stats.entityCount}</div>
-              <div className="stat-card-label">Entities</div>
+              <div className="stat-card-label">实体类型</div>
             </div>
             <div className="stat-card stat-card--purple">
               <Link2 size={16} className="stat-card-icon" />
               <div className="stat-card-value">{stats.relationshipCount}</div>
-              <div className="stat-card-label">Relationships</div>
+              <div className="stat-card-label">关系</div>
             </div>
             <div className="stat-card stat-card--green">
               <Network size={16} className="stat-card-icon" />
               <div className="stat-card-value">{stats.totalProperties}</div>
-              <div className="stat-card-label">Properties</div>
+              <div className="stat-card-label">属性</div>
             </div>
           </div>
 

@@ -1,9 +1,15 @@
 {
   "name": "FIBO Risk Lab — Step 2: Geographic Hierarchy",
-  "description": "Add regions, countries, and jurisdictions with disaster-zone flags for geographic risk analysis.",
+  "description": "加入区域、国家与司法辖区，带灾害区标记，用于地理风险分析。",
   "icon": "🌍",
   "category": "school",
-  "tags": ["fibo", "risk", "geography", "school", "step-2"],
+  "tags": [
+    "fibo",
+    "risk",
+    "geography",
+    "school",
+    "step-2"
+  ],
   "author": "EDM Council FIBO (adapted by ontology-quest)",
   "license": "MIT",
   "sourceUrl": "https://github.com/edmcouncil/fibo"

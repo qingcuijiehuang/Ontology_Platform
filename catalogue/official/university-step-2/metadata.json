@@ -1,8 +1,13 @@
 {
   "name": "University — Step 2: Faculty",
-  "description": "Adding Professor to teach courses and advise students",
+  "description": "加入教授，负责授课与指导学生。",
   "icon": "👨‍🏫",
   "category": "school",
-  "tags": ["education", "university", "school", "step-2"],
+  "tags": [
+    "education",
+    "university",
+    "school",
+    "step-2"
+  ],
   "author": "ontology-quest"
 }

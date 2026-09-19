@@ -84,7 +84,7 @@ export function LearnPage({ route }: LearnPageProps) {
         </button>
         <button className="learn-header-title" onClick={() => navigate({ page: 'learn' })}>
           <BookOpen size={20} />
-          <span>Ontology School</span>
+          <span>学习中心</span>
         </button>
         <button className="icon-btn" onClick={toggleDarkMode} title="Toggle Theme">
           {darkMode ? <Sun size={20} /> : <Moon size={20} />}
@@ -752,19 +752,10 @@ interface EmbedOntology {
 
 type EmbedEntry = { name: string; ontology: EmbedOntology };
 
-/** Shared chessboard background CSS (mirrors .graph-container in app.css) — fully opaque */
-function applyChessboardBg(el: HTMLElement, darkMode: boolean) {
-  const dark = darkMode ? '#0F1625' : '#DAE2F0';
-  const light = darkMode ? '#1A2840' : '#EEF2FB';
-  el.style.backgroundImage = [
-    `linear-gradient(45deg, ${dark} 25%, transparent 25%)`,
-    `linear-gradient(-45deg, ${dark} 25%, transparent 25%)`,
-    `linear-gradient(45deg, transparent 75%, ${dark} 75%)`,
-    `linear-gradient(-45deg, transparent 75%, ${dark} 75%)`,
-  ].join(',');
-  el.style.backgroundSize = '40px 40px';
-  el.style.backgroundPosition = '0 0, 0 20px, 20px -20px, -20px 0px';
-  el.style.backgroundColor = light;
+/** Shared solid graph-canvas background (mirrors .graph-container in app.css) */
+function applyGraphCanvasBg(el: HTMLElement, darkMode: boolean) {
+  el.style.backgroundImage = 'none';
+  el.style.backgroundColor = darkMode ? '#1E1E1E' : '#FFFFFF';
 }
 
 /** Build the shared Cytoscape style array */
@@ -959,7 +950,7 @@ function renderEmbedSlot(
   // Pre-built graph containers (created once, toggled via display)
   const afterDiv = document.createElement('div');
   afterDiv.style.cssText = 'width:100%;height:100%;position:absolute;inset:0';
-  applyChessboardBg(afterDiv, darkMode);
+  applyGraphCanvasBg(afterDiv, darkMode);
 
   let beforeDiv: HTMLDivElement | undefined;
   let afterCy: CytoscapeCore | undefined;
@@ -968,7 +959,7 @@ function renderEmbedSlot(
   if (hasDiff) {
     beforeDiv = document.createElement('div');
     beforeDiv.style.cssText = 'width:100%;height:100%;position:absolute;inset:0;display:none';
-    applyChessboardBg(beforeDiv, darkMode);
+    applyGraphCanvasBg(beforeDiv, darkMode);
 
     const toggleGroup = document.createElement('span');
     toggleGroup.style.cssText = 'display:inline-flex;border-radius:4px;overflow:hidden;border:1px solid ' + borderColor + ';flex-shrink:0';

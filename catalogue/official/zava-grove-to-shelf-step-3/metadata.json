@@ -1,6 +1,6 @@
 {
   "name": "Zava Grove-to-Shelf — Step 3: Cold-Chain Logistics",
-  "description": "Add Shipment and ColdChainSensor to model perishable logistics and live temperature telemetry.",
+  "description": "加入运单与冷链传感器，建模易腐品物流与实时温度遥测。",
   "icon": "🚛",
   "category": "school",
   "tags": [

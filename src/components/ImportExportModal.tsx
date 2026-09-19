@@ -1,27 +1,27 @@
 import { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { X, Upload, Download, FileJson, AlertCircle, CheckCircle, RotateCcw, Copy, FileText, Table, Share2, Cloud } from 'lucide-react';
+import { X, Upload, Download, FileJson, AlertCircle, CheckCircle, RotateCcw, Copy, FileText, Table, Share2, LibraryBig } from 'lucide-react';
 import { useAppStore } from '../store/appStore';
 import { serializeToRDF } from '../lib/rdf/serializer';
 import { parseRDF, RDFParseError } from '../lib/rdf/parser';
+import { saveUserOntology } from '../lib/userOntologyLibrary';
 import type { Ontology, DataBinding } from '../data/ontology';
 
 const LEGACY_FORMATS_ENABLED = import.meta.env.VITE_ENABLE_LEGACY_FORMATS === 'true';
 
 interface ImportExportModalProps {
   onClose: () => void;
-  onFabricPush?: () => void;
 }
 
 const sampleSchema = `{
   "ontology": {
-    "name": "My Ontology",
-    "description": "Description here",
+    "name": "我的本体",
+    "description": "描述",
     "entityTypes": [
       {
         "id": "entity1",
-        "name": "Entity Name",
-        "description": "What this entity represents",
+        "name": "实体名称",
+        "description": "实体说明",
         "icon": "📦",
         "color": "#0078D4",
         "properties": [
@@ -33,7 +33,7 @@ const sampleSchema = `{
     "relationships": [
       {
         "id": "rel1",
-        "name": "connects_to",
+        "name": "关联到",
         "from": "entity1",
         "to": "entity2",
         "cardinality": "1:n"
@@ -43,13 +43,17 @@ const sampleSchema = `{
   "bindings": []
 }`;
 
-export function ImportExportModal({ onClose, onFabricPush }: ImportExportModalProps) {
+export function ImportExportModal({ onClose }: ImportExportModalProps) {
   const { currentOntology, dataBindings, loadOntology, resetToDefault, exportOntology } = useAppStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importStatus, setImportStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [copied, setCopied] = useState(false);
   const [exportFormat, setExportFormat] = useState<'json' | 'yaml' | 'csv' | 'rdf'>('rdf');
+  /** 最近一次成功导入的本体 —— 「存入本体库」作用的对象。 */
+  const [imported, setImported] = useState<{ ontology: Ontology; bindings: DataBinding[] } | null>(null);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saved' | 'error'>('idle');
+  const [saveMessage, setSaveMessage] = useState<string>('');
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -60,33 +64,56 @@ export function ImportExportModal({ onClose, onFabricPush }: ImportExportModalPr
       try {
         const content = event.target?.result as string;
         const fileName = file.name.toLowerCase();
-        const trimmed = content.trimStart();
+        // 先去掉 BOM 再判断，避免带 BOM 的 UTF-8 文件被判成「未知格式」
+        const trimmed = content.replace(/^\uFEFF/, '').trimStart();
         const isRdfExt = fileName.endsWith('.rdf') || fileName.endsWith('.owl') || fileName.endsWith('.iq');
-        const isXmlContent = trimmed.startsWith('<?xml') || trimmed.startsWith('<rdf:RDF');
+        const isXmlContent = trimmed.startsWith('<');
 
         let ontology: Ontology;
         let bindings: DataBinding[] = [];
 
-        if (isRdfExt || isXmlContent) {
-          // Parse as RDF/OWL
+        if (isXmlContent || isRdfExt) {
+          // 解析器内部会识别 Turtle / JSON-LD 等非 XML 语法，
+          // 并给出「如何转成 RDF/XML」的中文指引，而不是笼统地报解析失败。
           const result = parseRDF(content);
           ontology = result.ontology;
           bindings = result.bindings;
+        } else if (/\.(ttl|n3|nt|trig|nq)$/.test(fileName)) {
+          throw new Error(
+            `「${file.name}」是 Turtle / N-Triples 语法，本平台目前只支持 RDF/XML。` +
+              '请在 Protégé 里用「File → Save As → RDF/XML Syntax」另存为 .rdf / .owl 后再导入，' +
+              '或先用在线转换工具把它转成 RDF/XML。',
+          );
+        } else if (/\.(jsonld|json-ld)$/.test(fileName)) {
+          throw new Error(
+            `「${file.name}」是 JSON-LD 格式，本平台目前只支持 RDF/XML。` +
+              '请先用在线转换工具把它转成 RDF/XML（.rdf / .owl）后再导入。',
+          );
         } else if (LEGACY_FORMATS_ENABLED && (fileName.endsWith('.json') || trimmed.startsWith('{'))) {
           // Parse as JSON (legacy)
           const parsed = JSON.parse(content);
 
           if (!parsed.ontology || !parsed.ontology.entityTypes || !parsed.ontology.relationships) {
-            throw new Error('Invalid ontology structure. Must have ontology.entityTypes and ontology.relationships.');
+            throw new Error('本体结构不合法，必须包含 ontology.entityTypes 与 ontology.relationships。');
           }
 
           ontology = parsed.ontology;
           bindings = parsed.bindings || [];
         } else {
           const supported = LEGACY_FORMATS_ENABLED
-            ? 'an RDF/OWL (.rdf, .owl, .iq) or JSON (.json)'
-            : 'an RDF/OWL (.rdf, .owl, .iq)';
-          throw new Error(`Unsupported file format: "${file.name}". Please import ${supported} file.`);
+            ? '一个 RDF/OWL (.rdf, .owl, .iq) 或 JSON (.json) 文件'
+            : '一个 RDF/OWL (.rdf, .owl, .iq) 文件';
+          throw new Error(`不支持的文件格式："${file.name}"，请导入 ${supported}。`);
+        }
+
+        // 解析成功但没有任何类定义 —— 图谱会是空的，提前讲清楚而不是让用户面对空画布
+        if (ontology.entityTypes.length === 0) {
+          setImportStatus('error');
+          setErrorMessage(
+            '文件解析成功，但里面没有任何类（owl:Class / rdfs:Class）定义，导入后图谱会是空的。' +
+              '请确认导出时包含了类定义；若这份文件其实是实例数据，可用顶栏的「接入数据源」加载。',
+          );
+          return;
         }
 
         // Fall back to filename (without extension) if no ontology name was parsed
@@ -95,18 +122,20 @@ export function ImportExportModal({ onClose, onFabricPush }: ImportExportModalPr
         }
 
         loadOntology(ontology, bindings);
+        setImported({ ontology, bindings });
         setImportStatus('success');
         setErrorMessage('');
-        
-        // Auto-close after success
-        setTimeout(() => onClose(), 1500);
+        setSaveStatus('idle');
+        setSaveMessage('');
+        // 导入成功后停留在弹窗内，让用户决定是否「存入本体库」；
+        // 「完成」按钮随时可以关闭。
       } catch (err) {
         setImportStatus('error');
         if (err instanceof RDFParseError) {
-          setErrorMessage(`RDF parse error: ${err.message}`);
-        } else {
-          setErrorMessage(err instanceof Error ? err.message : 'Failed to parse file');
-        }
+            setErrorMessage(`RDF 解析错误：${err.message}`);
+          } else {
+            setErrorMessage(err instanceof Error ? err.message : '解析文件失败');
+          }
       }
     };
     reader.readAsText(file);
@@ -231,9 +260,25 @@ export function ImportExportModal({ onClose, onFabricPush }: ImportExportModalPr
 
   const handleReset = () => {
     resetToDefault();
+    setImported(null);
     setImportStatus('success');
     setErrorMessage('');
+    setSaveStatus('idle');
+    setSaveMessage('');
     setTimeout(() => onClose(), 1000);
+  };
+
+  /** 把最近一次成功导入的本体存入本体库（localStorage），供「本体库」随时加载。 */
+  const handleSaveToLibrary = () => {
+    if (!imported) return;
+    try {
+      saveUserOntology(imported.ontology, imported.bindings);
+      setSaveStatus('saved');
+      setSaveMessage(`「${imported.ontology.name}」已存入本体库，可在「本体库」里随时加载。`);
+    } catch (err) {
+      setSaveStatus('error');
+      setSaveMessage(err instanceof Error ? err.message : '保存到本体库失败。');
+    }
   };
 
   return (
@@ -254,9 +299,9 @@ export function ImportExportModal({ onClose, onFabricPush }: ImportExportModalPr
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
           <div>
-            <h2 style={{ fontSize: 24, fontWeight: 600 }}>Import / Export Ontology</h2>
+            <h2 style={{ fontSize: 24, fontWeight: 600 }}>导入 / 导出本体</h2>
             <p style={{ fontSize: 14, color: 'var(--text-secondary)', marginTop: 4 }}>
-              Load your own ontology or export the current one
+              加载你自己的本体，或导出当前正在编辑的本体
             </p>
           </div>
           <button className="icon-btn" onClick={onClose}>
@@ -265,9 +310,9 @@ export function ImportExportModal({ onClose, onFabricPush }: ImportExportModalPr
         </div>
 
         {/* Current Ontology Info */}
-        <div style={{ 
-          padding: 16, 
-          background: 'var(--bg-tertiary)', 
+        <div style={{
+          padding: 16,
+          background: 'var(--bg-tertiary)',
           borderRadius: 'var(--radius-md)',
           marginBottom: 20,
           display: 'flex',
@@ -275,44 +320,79 @@ export function ImportExportModal({ onClose, onFabricPush }: ImportExportModalPr
           alignItems: 'center'
         }}>
           <div>
-            <div style={{ fontSize: 13, color: 'var(--text-tertiary)', marginBottom: 4 }}>Currently Loaded</div>
+            <div style={{ fontSize: 13, color: 'var(--text-tertiary)', marginBottom: 4 }}>当前加载的本体</div>
             <div style={{ fontSize: 16, fontWeight: 600 }}>{currentOntology.name}</div>
             <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-              {currentOntology.entityTypes.length} entity types, {currentOntology.relationships.length} relationships
+              {currentOntology.entityTypes.length} 个实体类型，{currentOntology.relationships.length} 条关系
             </div>
           </div>
-          <button 
-            className="btn btn-secondary" 
+          <button
+            className="btn btn-secondary"
             onClick={handleReset}
             style={{ display: 'flex', alignItems: 'center', gap: 6 }}
           >
             <RotateCcw size={14} />
-            Reset to Default
+            恢复默认
           </button>
         </div>
 
         {/* Status Messages */}
         {importStatus === 'success' && (
-          <div style={{ 
-            padding: 12, 
-            background: 'rgba(15, 123, 15, 0.15)', 
-            borderRadius: 'var(--radius-md)', 
-            marginBottom: 20,
+          <div style={{
+            padding: 12,
+            background: 'rgba(15, 123, 15, 0.15)',
+            borderRadius: 'var(--radius-md)',
+            marginBottom: 12,
             display: 'flex',
             alignItems: 'center',
             gap: 10,
             color: 'var(--ms-green)'
           }}>
             <CheckCircle size={18} />
-            <span>Ontology loaded successfully!</span>
+            <span style={{ flex: 1 }}>本体已成功加载！</span>
+            {imported && (
+              <button
+                className="btn btn-secondary"
+                onClick={handleSaveToLibrary}
+                disabled={saveStatus === 'saved'}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  color: saveStatus === 'saved' ? 'var(--ms-green)' : undefined,
+                  borderColor: saveStatus === 'saved' ? 'var(--ms-green)' : undefined,
+                }}
+                title="把这份本体保存到本体库（仅存在本浏览器），之后可在「本体库」里一键加载"
+              >
+                <LibraryBig size={14} />
+                {saveStatus === 'saved' ? '已存入本体库' : '存入本体库'}
+              </button>
+            )}
+          </div>
+        )}
+
+        {saveMessage && (
+          <div style={{
+            padding: '8px 12px',
+            borderRadius: 'var(--radius-md)',
+            marginBottom: 20,
+            fontSize: 12,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            background: saveStatus === 'error' ? 'rgba(209, 52, 56, 0.12)' : 'rgba(0, 120, 212, 0.08)',
+            color: saveStatus === 'error' ? '#D13438' : 'var(--text-secondary)',
+          }} role="status" aria-live="polite">
+            {saveStatus === 'error' ? <AlertCircle size={13} /> : <CheckCircle size={13} />}
+            <span>{saveMessage}</span>
           </div>
         )}
 
         {importStatus === 'error' && (
-          <div style={{ 
-            padding: 12, 
-            background: 'rgba(209, 52, 56, 0.15)', 
-            borderRadius: 'var(--radius-md)', 
+          <div style={{
+            padding: 12,
+            background: 'rgba(209, 52, 56, 0.15)',
+            borderRadius: 'var(--radius-md)',
             marginBottom: 20,
             display: 'flex',
             alignItems: 'flex-start',
@@ -368,25 +448,29 @@ export function ImportExportModal({ onClose, onFabricPush }: ImportExportModalPr
             }}>
               <Upload size={24} color="var(--ms-blue)" />
             </div>
-            <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>Import Ontology</div>
+            <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>导入本体</div>
             <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>
-              {LEGACY_FORMATS_ENABLED ? 'Drop JSON or RDF/OWL file here' : 'Drop RDF/OWL (.rdf, .owl, .iq) file here'}
+              {LEGACY_FORMATS_ENABLED ? '把 JSON 或 RDF/OWL 文件拖到这里' : '把 RDF/OWL (.rdf, .owl, .iq) 文件拖到这里'}
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 6, lineHeight: 1.5 }}>
+              兼容 owl:Class / rdfs:Class，
+              以及 rdf:Description + rdf:type 两种 RDF/XML 写法
             </div>
           </div>
 
-          <div 
-            style={{ 
-              padding: 24, 
-              background: 'var(--bg-tertiary)', 
+          <div
+            style={{
+              padding: 24,
+              background: 'var(--bg-tertiary)',
               borderRadius: 'var(--radius-lg)',
               border: '2px solid transparent',
               textAlign: 'center'
             }}
           >
-            <div style={{ 
-              width: 48, 
-              height: 48, 
-              background: 'rgba(15, 123, 15, 0.15)', 
+            <div style={{
+              width: 48,
+              height: 48,
+              background: 'rgba(15, 123, 15, 0.15)',
               borderRadius: 'var(--radius-md)',
               display: 'flex',
               alignItems: 'center',
@@ -395,7 +479,7 @@ export function ImportExportModal({ onClose, onFabricPush }: ImportExportModalPr
             }}>
               <Download size={24} color="var(--ms-green)" />
             </div>
-            <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>Export Current</div>
+            <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>导出当前本体</div>
             
             {/* Format Selector — only shown when legacy formats are enabled */}
             {LEGACY_FORMATS_ENABLED && (
@@ -468,7 +552,7 @@ export function ImportExportModal({ onClose, onFabricPush }: ImportExportModalPr
                     alignItems: 'center',
                     gap: 4
                   }}
-                  title="RDF/XML format for MS Fabric"
+                  title="RDF/XML 格式（兼容 Microsoft Fabric）"
                 >
                   <Share2 size={12} />
                   RDF
@@ -476,24 +560,13 @@ export function ImportExportModal({ onClose, onFabricPush }: ImportExportModalPr
               </div>
             )}
             
-            <button 
+            <button
               className="btn btn-primary"
               onClick={handleExport}
               style={{ width: '100%' }}
             >
               {LEGACY_FORMATS_ENABLED ? `Download .${exportFormat}` : 'Download RDF/OWL'}
             </button>
-
-            {onFabricPush && (
-              <button
-                className="btn btn-secondary"
-                onClick={onFabricPush}
-                style={{ width: '100%', marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
-              >
-                <Cloud size={14} />
-                Push to Microsoft Fabric
-              </button>
-            )}
           </div>
         </div>
 
@@ -509,7 +582,7 @@ export function ImportExportModal({ onClose, onFabricPush }: ImportExportModalPr
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <FileJson size={16} color="var(--text-tertiary)" />
                 <span style={{ fontSize: 13, color: 'var(--text-secondary)', fontWeight: 600 }}>
-                  JSON Schema Reference
+                  JSON 结构参考
                 </span>
               </div>
               <button 
@@ -518,7 +591,7 @@ export function ImportExportModal({ onClose, onFabricPush }: ImportExportModalPr
                 onClick={handleCopySchema}
               >
                 <Copy size={12} style={{ marginRight: 4 }} />
-                {copied ? 'Copied!' : 'Copy'}
+                {copied ? '已复制' : '复制'}
               </button>
             </div>
             <pre style={{ 
@@ -539,7 +612,7 @@ export function ImportExportModal({ onClose, onFabricPush }: ImportExportModalPr
 
         <div style={{ marginTop: 20, textAlign: 'center' }}>
           <button className="btn btn-primary" onClick={onClose}>
-            Done
+            完成
           </button>
         </div>
       </motion.div>

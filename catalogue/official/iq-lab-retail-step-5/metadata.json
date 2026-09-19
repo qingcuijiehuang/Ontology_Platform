@@ -1,6 +1,6 @@
 {
   "name": "Retail Supply Chain — Step 5: Inventory & Demand",
-  "description": "Inventory, Forecast, DemandSignal track stock and predictions",
+  "description": "库存、预测、需求信号，跟踪库存水位与预测。",
   "icon": "📊",
   "category": "school",
   "tags": [

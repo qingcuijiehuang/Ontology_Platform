@@ -12,32 +12,32 @@ interface TourStep {
 const tourSteps: TourStep[] = [
   {
     target: '.header',
-    title: 'Navigation & Actions',
-    description: 'Use the toolbar to access the Catalogue, Designer, Learn articles, Import/Export, and more. Press ⌘K anytime to open the command palette.',
+    title: '顶栏导航',
+    description: '顶栏可快速进入「接入数据源 / 摘要 / 本体库 / 设计器 / 主题」；右上角的「模型连接」用于接入 GPT、DeepSeek、GLM 等大模型。随时按 ⌘K 打开命令面板。',
     placement: 'bottom',
   },
   {
     target: '.graph-container',
-    title: 'Ontology Graph',
-    description: 'This is your ontology visualized as an interactive graph. Click on entity nodes or relationship edges to inspect them.',
+    title: '本体图谱',
+    description: '这是当前本体的可视化图谱。点击实体节点或关系连线，可在右侧查看其属性、关系与数据源映射。',
     placement: 'bottom',
   },
   {
-    target: '.quest-panel',
-    title: 'Quests',
-    description: 'Complete guided quests to learn ontology concepts step by step. Earn badges and points along the way!',
-    placement: 'right',
+    target: '.ai-console',
+    title: '智能检索问答',
+    description: '在图谱下方直接提问：系统会把本体结构与已接入的真实数据集作为依据交给大模型，流式给出回答，并实时加亮命中的实体与关系。',
+    placement: 'top',
   },
   {
     target: '.right-sidebar',
-    title: 'Inspector & Query',
-    description: 'Select an entity to see its properties and data bindings. Use the query bar at the bottom to ask natural language questions.',
+    title: '检视器 / 实例浏览',
+    description: '选中实体查看属性；用搜索框定位实体；用路径查找追溯关系；用「实例浏览」查看接入的真实数据行与列映射。',
     placement: 'left',
   },
   {
-    target: '.header-actions [data-tooltip="Designer"]',
-    title: 'Ontology Designer',
-    description: 'Build your own ontologies from scratch or start from a template. Export as RDF or submit to the community catalogue.',
+    target: '.header-actions [data-tooltip="本体设计器"]',
+    title: '本体设计器',
+    description: '从零或模板构建本体，导出为 RDF 文件，或一键接入真实数据源进行检索。',
     placement: 'bottom',
   },
 ];
@@ -68,9 +68,9 @@ export function GuidedTour({ onComplete }: GuidedTourProps) {
   }, [onComplete]);
 
   // Filter steps to only those whose target element is visible.
-  // On mobile (≤900px), panels like .quest-panel and .right-sidebar are
-  // display:none, so they get filtered out. If no steps are visible
-  // (e.g. very small screen), auto-dismiss the tour.
+  // On mobile (≤900px), panels like .right-sidebar are display:none, so they
+  // get filtered out. If no steps are visible (e.g. very small screen),
+  // auto-dismiss the tour.
   useEffect(() => {
     const visible = tourSteps.filter(s => isElementVisible(s.target));
     if (visible.length === 0) {
@@ -175,7 +175,7 @@ export function GuidedTour({ onComplete }: GuidedTourProps) {
       >
         <div className="tour-tooltip-header">
           <span className="tour-tooltip-step">{stepIdx + 1}/{visibleSteps.length}</span>
-          <button className="tour-tooltip-close" onClick={dismiss} aria-label="Close tour">
+          <button className="tour-tooltip-close" onClick={dismiss} aria-label="关闭引导">
             <X size={16} />
           </button>
         </div>
@@ -184,19 +184,19 @@ export function GuidedTour({ onComplete }: GuidedTourProps) {
         <div className="tour-tooltip-actions">
           {stepIdx > 0 && (
             <button className="tour-btn tour-btn-secondary" onClick={prev}>
-              <ChevronLeft size={14} /> Back
+              <ChevronLeft size={14} /> 上一步
             </button>
           )}
           <button className="tour-btn tour-btn-primary" onClick={next}>
             {stepIdx < visibleSteps.length - 1 ? (
-              <>Next <ChevronRight size={14} /></>
+              <>下一步 <ChevronRight size={14} /></>
             ) : (
-              'Get started!'
+              '开始使用'
             )}
           </button>
         </div>
         <button className="tour-skip" onClick={dismiss}>
-          Skip tour · don't show again
+          跳过 · 不再显示
         </button>
       </motion.div>
     </AnimatePresence>

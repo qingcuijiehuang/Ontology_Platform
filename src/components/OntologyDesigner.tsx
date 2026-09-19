@@ -65,14 +65,14 @@ export function OntologyDesigner({ route }: OntologyDesignerProps) {
             type="text"
             value={ontology.name}
             onChange={(e) => setOntologyName(e.target.value)}
-            placeholder="Ontology name"
+            placeholder="本体名称"
           />
           <input
             className="designer-meta-desc"
             type="text"
             value={ontology.description}
             onChange={(e) => setOntologyDescription(e.target.value)}
-            placeholder="Description"
+            placeholder="描述"
           />
         </div>
         <DesignerToolbar />

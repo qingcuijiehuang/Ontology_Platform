@@ -87,7 +87,7 @@ export function PathFinderPanel() {
       >
         <span className="pathfinder-title">
           <GitFork size={14} />
-          Path Finder
+          路径查找
         </span>
         {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
       </button>
@@ -96,13 +96,13 @@ export function PathFinderPanel() {
         <div className="pathfinder-body">
           <div className="pathfinder-selects">
             <div className="pathfinder-select-group">
-              <label className="pathfinder-label">From</label>
+              <label className="pathfinder-label">起点</label>
               <select
                 className="pathfinder-select"
                 value={fromId}
                 onChange={e => { setFromId(e.target.value); setSearched(false); clearHighlights(); }}
               >
-                <option value="">Select entity…</option>
+                <option value="">选择实体…</option>
                 {entities.map(e => (
                   <option key={e.id} value={e.id}>{e.icon} {e.name}</option>
                 ))}
@@ -112,13 +112,13 @@ export function PathFinderPanel() {
             <ArrowRight size={16} className="pathfinder-arrow-icon" />
 
             <div className="pathfinder-select-group">
-              <label className="pathfinder-label">To</label>
+              <label className="pathfinder-label">终点</label>
               <select
                 className="pathfinder-select"
                 value={toId}
                 onChange={e => { setToId(e.target.value); setSearched(false); clearHighlights(); }}
               >
-                <option value="">Select entity…</option>
+                <option value="">选择实体…</option>
                 {entities.map(e => (
                   <option key={e.id} value={e.id}>{e.icon} {e.name}</option>
                 ))}
@@ -133,32 +133,32 @@ export function PathFinderPanel() {
               disabled={!fromId || !toId || !!sameEntity}
             >
               <Search size={13} />
-              Find Path
+              查找路径
             </button>
             {searched && (
               <button className="pathfinder-btn-clear" onClick={handleClear}>
                 <X size={13} />
-                Clear
+                清空
               </button>
             )}
           </div>
 
           {sameEntity && (
             <div className="pathfinder-message pathfinder-message--warn">
-              Select two different entities.
+              请选择两个不同的实体。
             </div>
           )}
 
           {noPath && (
             <div className="pathfinder-message pathfinder-message--warn">
-              No directed path found between these entities.
+              两个实体之间没有可达路径。
             </div>
           )}
 
           {displaySteps.length > 0 && (
             <div className="pathfinder-result">
               <div className="pathfinder-result-label">
-                Shortest path — {displaySteps.length - 1} hop{displaySteps.length - 1 !== 1 ? 's' : ''}
+                最短路径 · {displaySteps.length - 1} 跳
               </div>
               <div className="pathfinder-chain">
                 {displaySteps.map((step, i) => (

@@ -1,6 +1,6 @@
 {
   "name": "Schema.org — Event",
-  "description": "Events, venues, performers, and offers — a subset of Schema.org's vocabulary for describing events, ticket sales, and scheduling.",
+  "description": "活动、场馆、演出者与票务优惠 —— Schema.org 词表中用于描述活动、售票与日程安排的子集。",
   "icon": "🎫",
   "category": "events",
   "tags": [

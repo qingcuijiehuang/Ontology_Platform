@@ -22,22 +22,22 @@ export function OntologySummaryModal({ onClose }: OntologySummaryModalProps) {
     lines.push('');
     
     // Entities section
-    lines.push('## Entities');
+    lines.push('## 实体');
     lines.push('');
     currentOntology.entityTypes.forEach(entity => {
       lines.push(`### ${entity.icon} ${entity.name}`);
       lines.push(`${entity.description}`);
       lines.push('');
-      lines.push('**Properties:**');
+      lines.push('**属性：**');
       entity.properties.forEach(prop => {
-        const identifier = prop.isIdentifier ? ' (identifier)' : '';
-        lines.push(`- **${prop.name}** (${prop.type})${identifier}: ${prop.description}`);
+        const identifier = prop.isIdentifier ? '（主键）' : '';
+        lines.push(`- **${prop.name}** (${prop.type})${identifier}：${prop.description}`);
       });
       lines.push('');
     });
-    
+
     // Relationships section
-    lines.push('## Relationships');
+    lines.push('## 关系');
     lines.push('');
     currentOntology.relationships.forEach(rel => {
       const fromEntity = currentOntology.entityTypes.find(e => e.id === rel.from);
